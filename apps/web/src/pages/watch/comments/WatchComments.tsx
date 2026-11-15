@@ -5,6 +5,7 @@ import { KzButton } from '../../../components/ui'
 import { CommentCard } from './CommentCard'
 import { CommentPagination } from './CommentPagination'
 import { CommentSkeleton } from './CommentSkeleton'
+import { useWatchLayoutMode } from '../useWatchLayoutMode'
 
 const PAGE_SIZE = 10
 
@@ -13,6 +14,8 @@ export const WatchComments = memo(function WatchComments({
 }: {
   bangumiId: number
 }) {
+  const layoutMode = useWatchLayoutMode()
+  const isDesktop = layoutMode === 'desktop'
   const [page, setPage] = useState(1)
   const containerRef = useRef<HTMLDivElement>(null)
   const shouldScrollOnDataRef = useRef(false)
@@ -126,24 +129,26 @@ export const WatchComments = memo(function WatchComments({
       className="kz-watch-comments rounded-2xl border border-[var(--kz-border)]/60 bg-[var(--kz-bg-card)]/30 p-4 sm:p-5 space-y-4 shadow-xs"
       aria-label="番剧吐槽"
     >
-      {/* 头部标题与数量统计 */}
-      <div className="flex items-center justify-between border-b border-[var(--kz-border)]/40 pb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-base font-bold tracking-tight text-[var(--kz-fg)]">
-            💭 吐槽
-          </span>
-          {total > 0 && (
-            <span className="rounded-full bg-[var(--kz-bg-soft)] px-2 py-0.5 text-xs font-semibold tabular-nums text-[var(--kz-fg-muted)]">
-              {total.toLocaleString()}
+      {/* 头部标题与数量统计：桌面端不展示标题，移动端保留 */}
+      {!isDesktop && (
+        <div className="flex items-center justify-between border-b border-[var(--kz-border)]/40 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold tracking-tight text-[var(--kz-fg)]">
+              💭 吐槽
+            </span>
+            {total > 0 && (
+              <span className="rounded-full bg-[var(--kz-bg-soft)] px-2 py-0.5 text-xs font-semibold tabular-nums text-[var(--kz-fg-muted)]">
+                {total.toLocaleString()}
+              </span>
+            )}
+          </div>
+          {isFetching && !isLoading && (
+            <span className="text-xs text-[var(--kz-fg-dim)] animate-pulse">
+              刷新中…
             </span>
           )}
         </div>
-        {isFetching && !isLoading && (
-          <span className="text-xs text-[var(--kz-fg-dim)] animate-pulse">
-            刷新中…
-          </span>
-        )}
-      </div>
+      )}
 
       {/* 列表渲染区 */}
       {isLoading ? (

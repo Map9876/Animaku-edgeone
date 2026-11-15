@@ -102,7 +102,7 @@ function MetaChips({ item }: { item: BangumiItem }) {
         </span>
       )}
       {Boolean(item.doing && item.doing > 0) && (
-        <span className="kz-watch-chip tabular-nums text-amber-500/90 dark:text-amber-400">
+        <span className="kz-watch-chip kz-watch-chip-doing tabular-nums">
           {formatDoingCount(item.doing)} 在看
         </span>
       )}

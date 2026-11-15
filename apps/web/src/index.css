@@ -594,6 +594,12 @@ textarea:focus-visible {
   border-color: color-mix(in srgb, var(--kz-score) 25%, transparent);
 }
 
+.kz-watch-chip-doing {
+  color: var(--kz-like);
+  background: color-mix(in srgb, var(--kz-like) 12%, var(--kz-bg-soft));
+  border-color: color-mix(in srgb, var(--kz-like) 25%, transparent);
+}
+
 .kz-watch-chip-air-airing {
   color: var(--kz-air-airing);
   background: color-mix(in srgb, var(--kz-air-airing) 12%, var(--kz-bg-soft));
@@ -1624,4 +1630,90 @@ html[data-theme='dark'] .kz-source-pill--retry:hover {
   .kz-nav-title:hover {
     animation: none !important;
   }
+}
+
+/* =========================================================================
+ * 📺 Bilibili-Style Pagination (vui_pagenation)
+ * 32px height, 6px radius, Soft Muted Rose active theme
+ * ========================================================================= */
+.vui_pagenation {
+  display: flex;
+  align-items: center;
+  user-select: none;
+}
+
+.vui_pagenation--btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vui_pagenation .vui_button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--kz-border);
+  background-color: var(--kz-bg-card);
+  color: var(--kz-fg-muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.vui_pagenation .vui_button:hover:not(:disabled):not(.vui_button--active) {
+  background-color: var(--kz-bg-hover);
+  color: var(--kz-fg);
+  border-color: var(--kz-border);
+}
+
+.vui_pagenation .vui_button:disabled,
+.vui_pagenation .vui_button--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.vui_pagenation .vui_pagenation--btn-num {
+  min-width: 32px;
+  padding: 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vui_pagenation .vui_pagenation--btn-side {
+  padding: 0 12px;
+}
+
+.vui_pagenation .vui_pagenation--extend {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 32px;
+  font-size: 13px;
+  color: var(--kz-fg-dim);
+  user-select: none;
+}
+
+/* B站同款激活态：水感淡蓝色 (Soft Muted Blue) */
+.vui_pagenation .vui_button--active-blue,
+.vui_pagenation .vui_button--active {
+  color: #008ac5 !important;
+  background-color: rgba(0, 174, 236, 0.10) !important;
+  border-color: rgba(0, 174, 236, 0.35) !important;
+  font-weight: 500 !important;
+  cursor: default;
+  pointer-events: none;
+}
+
+.dark .vui_pagenation .vui_button--active-blue,
+.dark .vui_pagenation .vui_button--active {
+  color: #38bdf8 !important;
+  background-color: rgba(56, 189, 248, 0.16) !important;
+  border-color: rgba(56, 189, 248, 0.45) !important;
+  font-weight: 500 !important;
 }

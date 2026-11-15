@@ -274,25 +274,8 @@ export function WatchRecommendations({
       className="kz-watch-panel shrink-0 overflow-hidden rounded-xl border border-[var(--kz-border)] bg-[var(--kz-bg-elevated)] shadow-2xs transition-all duration-300"
       aria-label="番剧推荐"
     >
-      {/* 头部：桌面端为常驻标题，移动端支持折叠切换 */}
-      {isDesktop ? (
-        <div className="flex w-full items-center justify-between px-3 py-2.5 text-left border-b border-[var(--kz-border-subtle)]">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="h-3.5 w-1 shrink-0 rounded-full bg-[var(--kz-accent)]"
-              aria-hidden
-            />
-            <span className="font-semibold text-xs sm:text-[13px] text-[var(--kz-fg)] tracking-tight flex items-center gap-1.5">
-              番剧推荐
-              {items.length > 0 && (
-                <span className="text-[11px] font-normal text-[var(--kz-fg-muted)]">
-                  ({items.length})
-                </span>
-              )}
-            </span>
-          </div>
-        </div>
-      ) : (
+      {/* 头部：桌面端不展示标题，移动端保留折叠切换 */}
+      {!isDesktop && (
         <button
           type="button"
           onClick={() => setIsOpen((v) => !v)}

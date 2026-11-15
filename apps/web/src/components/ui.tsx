@@ -1134,3 +1134,6 @@ export const KzTextarea = forwardRef<HTMLTextAreaElement, KzTextareaProps>(
     )
   },
 )
+
+export { KzPagination, computeBiliPagination } from './Pagination'
+export type { KzPaginationProps } from './Pagination'

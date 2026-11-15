@@ -8,6 +8,7 @@ import {
   ErrorState,
   PageHeader,
   KzSelect,
+  KzPagination,
 } from '../components/ui'
 import clsx from 'clsx'
 
@@ -369,37 +370,18 @@ export function AnimePage() {
       ) : null}
 
       {!q.isError && totalPages > 1 && (
-        <nav
-          className="mt-8 flex flex-wrap items-center justify-center gap-2"
-          aria-label="分页"
-        >
-          <button
-            type="button"
-            disabled={page <= 1 || q.isFetching}
-            onClick={() =>
-              patchParams(
-                { page: page <= 2 ? null : String(page - 1) },
-                { resetPage: false },
-              )
-            }
-            className="kz-pill kz-pill-idle border border-[var(--kz-border)] disabled:opacity-40"
-          >
-            上一页
-          </button>
-          <span className="px-2 text-[13px] tabular-nums text-[var(--kz-fg-muted)]">
-            {page} / {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={page >= totalPages || q.isFetching}
-            onClick={() =>
-              patchParams({ page: String(page + 1) }, { resetPage: false })
-            }
-            className="kz-pill kz-pill-idle border border-[var(--kz-border)] disabled:opacity-40"
-          >
-            下一页
-          </button>
-        </nav>
+        <KzPagination
+          page={page}
+          totalPages={totalPages}
+          disabled={q.isFetching}
+          onPageChange={(p) =>
+            patchParams(
+              { page: p <= 1 ? null : String(p) },
+              { resetPage: false },
+            )
+          }
+          className="mt-8"
+        />
       )}
     </div>
   )
