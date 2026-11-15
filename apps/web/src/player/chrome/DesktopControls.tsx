@@ -181,6 +181,39 @@ export function DesktopControls(props: PlayerControlsProps) {
     hoverRatio * 100 >= edMarker.left &&
     hoverRatio * 100 <= edMarker.left + edMarker.width
 
+  const [volOpen, setVolOpen] = useState(false)
+  const volWrapRef = useRef<HTMLDivElement>(null)
+  const volHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleVolEnter = () => {
+    if (volHoverTimerRef.current) clearTimeout(volHoverTimerRef.current)
+    setVolOpen(true)
+  }
+
+  const handleVolLeave = () => {
+    if (volHoverTimerRef.current) clearTimeout(volHoverTimerRef.current)
+    volHoverTimerRef.current = setTimeout(() => {
+      setVolOpen(false)
+      // When mouse leaves, blur any focused slider input inside so focus doesn't keep it open
+      if (
+        document.activeElement &&
+        volWrapRef.current?.contains(document.activeElement)
+      ) {
+        ;(document.activeElement as HTMLElement).blur()
+      }
+    }, 100)
+  }
+
+  const handleVolumeWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (!volOpen) return
+    e.preventDefault()
+    e.stopPropagation()
+    const step = e.deltaMode === 1 ? 0.05 : Math.abs(e.deltaY) >= 40 ? 0.05 : 0.02
+    const delta = e.deltaY < 0 ? step : -step
+    const newVol = Math.max(0, Math.min(1, Math.round((vol + delta) * 100) / 100))
+    onVolume(newVol)
+  }
+
   const pinBar =
     showBar ||
     paused ||
@@ -188,7 +221,8 @@ export function DesktopControls(props: PlayerControlsProps) {
     srMenuOpen ||
     speedMenuOpen ||
     settingsMenuOpen ||
-    opedDrawerOpen
+    opedDrawerOpen ||
+    volOpen
   const vol = player.volume ?? DEFAULT_PLAYER_VOLUME
   const isMuted = vol <= 0.001
 
@@ -294,6 +328,7 @@ export function DesktopControls(props: PlayerControlsProps) {
       <div
         ref={seekWrapRef}
         className="kz-seek-wrap"
+        data-dragging={dragRatio !== null}
         onPointerDown={handleSeekPointerDown}
         onPointerMove={handleSeekPointerMove}
         onPointerUp={handleSeekPointerUp}
@@ -306,6 +341,7 @@ export function DesktopControls(props: PlayerControlsProps) {
           duration={duration}
           height={24}
           numBuckets={60}
+          dragRatio={dragRatio}
         />
 
         {/* OP/ED Chapter Markers */}
@@ -467,6 +503,57 @@ export function DesktopControls(props: PlayerControlsProps) {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Volume Control (Bilibili-style vertical hover popup next to Speed Menu) */}
+          <div
+            ref={volWrapRef}
+            className="kz-vol-wrap"
+            onMouseEnter={handleVolEnter}
+            onMouseLeave={handleVolLeave}
+          >
+            {/* Expanded Vertical Volume Panel */}
+            <div
+              className="kz-vol-box"
+              data-open={volOpen}
+              onWheel={handleVolumeWheel}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="kz-vol-number tabular-nums">
+                {Math.round(vol * 100)}
+              </div>
+              <div className="kz-vol-slider-vertical">
+                <div className="kz-vol-rail-vertical" aria-hidden>
+                  <div
+                    className="kz-vol-fill-vertical"
+                    style={{ height: `${Math.round(vol * 100)}%` }}
+                  />
+                </div>
+                <input
+                  type="range"
+                  className="kz-vol-range-vertical"
+                  min={0}
+                  max={100}
+                  value={Math.round(vol * 100)}
+                  onChange={(e) => onVolume(Number(e.target.value) / 100)}
+                  onPointerUp={(e) => e.currentTarget.blur()}
+                  aria-label="音量"
+                />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="kz-ctrl kz-ctrl-icon kz-vol-btn"
+              data-active={isMuted}
+              onClick={onToggleMute}
+              title={isMuted ? '取消静音 (M)' : '静音 (M)'}
+              aria-label={isMuted ? '取消静音' : '静音'}
+              aria-pressed={isMuted}
+            >
+              {isMuted ? <IconVolumeMute /> : <IconVolume />}
+            </button>
           </div>
 
           {/* OP/ED Marker Assistant */}
@@ -791,41 +878,6 @@ export function DesktopControls(props: PlayerControlsProps) {
                 )}
               </div>
             )}
-          </div>
-
-          {/* Volume Control */}
-          <div className="kz-vol-wrap">
-            <button
-              type="button"
-              className="kz-ctrl kz-ctrl-icon kz-vol-btn"
-              data-active={isMuted}
-              onClick={onToggleMute}
-              title={isMuted ? '取消静音' : '静音'}
-              aria-label={isMuted ? '取消静音' : '静音'}
-              aria-pressed={isMuted}
-            >
-              {isMuted ? <IconVolumeMute /> : <IconVolume />}
-            </button>
-            <div className="kz-vol-slider">
-              <div className="kz-vol-rail" aria-hidden>
-                <div
-                  className="kz-vol-fill"
-                  style={{
-                    width: `${Math.round(vol * 100)}%`,
-                  }}
-                />
-              </div>
-              <input
-                type="range"
-                className="kz-vol"
-                min={0}
-                max={100}
-                value={Math.round(vol * 100)}
-                onChange={(e) => onVolume(Number(e.target.value) / 100)}
-                onPointerUp={releaseSliderFocus}
-                aria-label="音量"
-              />
-            </div>
           </div>
 
           {/* Wide Screen / Theater Mode (Bilibili-style) */}

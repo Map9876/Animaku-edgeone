@@ -33,6 +33,7 @@ import {
   type PlayerStatsData,
 } from './chrome/PlayerStatsOverlay'
 import type { PlayerControlsProps } from './chrome/types'
+import { IconCatPauseBadge } from './chrome/icons'
 
 // Sub-modules & Overlays
 import {
@@ -1344,18 +1345,16 @@ export function VideoPlayer({
       {/* Drag & drop overlay */}
       <DanmakuDropOverlay active={dropActive} />
 
-      {/* Central Play/Pause Spring Ripple */}
-      <PlaybackRipple ripple={ripple} />
-
-      {/* Center play button when paused */}
+      {/* Corner Bilibili-style cat-ear TV pause badge */}
       {paused && !loading && !seekingUi && !bufferingUi && !mediaError && (
         <button
           type="button"
-          className="kz-big-play"
+          className="kz-corner-pause"
           aria-label="播放"
+          title="播放"
           onClick={togglePlay}
         >
-          ▶
+          <IconCatPauseBadge />
         </button>
       )}
 

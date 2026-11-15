@@ -69,7 +69,7 @@ export const PlayerSeekRange = memo(function PlayerSeekRange({
 })
 
 /**
- * 计算弹幕热力图 SVG 波浪曲线路径
+ * 计算弹幕热力图 SVG 波浪曲线路径（三阶贝塞尔平滑曲线）
  */
 export function computeDanmakuHeatmap(
   comments: DanmakuComment[] | undefined,
@@ -99,12 +99,29 @@ export function computeDanmakuHeatmap(
   })
   const smoothedMax = Math.max(...smoothed) || 1
 
-  let path = `M 0 ${height}`
+  const points: { x: number; y: number }[] = []
   for (let i = 0; i < numBuckets; i++) {
     const x = (i / (numBuckets - 1)) * 100
     const normalized = smoothed[i] / smoothedMax
+    // 顶部留出 3px 安全边距，波谷底线保持在 height
     const y = height - Math.pow(normalized, 0.75) * (height - 3)
-    path += ` L ${x.toFixed(1)} ${y.toFixed(1)}`
+    points.push({ x, y })
+  }
+
+  // 构造三阶贝塞尔平滑曲线（Catmull-Rom to Cubic Bezier），使波峰波谷圆润高级
+  let path = `M 0 ${height} L ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`
+  for (let i = 1; i < points.length; i++) {
+    const p0 = points[i - 2] ?? points[i - 1]
+    const p1 = points[i - 1]
+    const p2 = points[i]
+    const p3 = points[i + 1] ?? p2
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = Math.min(height, Math.max(0, p1.y + (p2.y - p0.y) / 6))
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = Math.min(height, Math.max(0, p2.y - (p3.y - p1.y) / 6))
+
+    path += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)}, ${cp2x.toFixed(2)} ${cp2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
   }
   path += ` L 100 ${height} Z`
   return path
@@ -116,10 +133,11 @@ export interface PlayerDanmakuHeatmapProps {
   height?: number
   numBuckets?: number
   idPrefix?: string
+  dragRatio?: number | null
 }
 
 /**
- * 局部订阅弹幕热力图组件（纯净优雅的弹幕密度波浪，鼠标悬停时高亮浮现）
+ * 局部订阅弹幕热力图组件（B 站风格双色注入波浪，跟随播放进度实时注满点亮）
  */
 export const PlayerDanmakuHeatmap = memo(function PlayerDanmakuHeatmap({
   comments,
@@ -127,9 +145,16 @@ export const PlayerDanmakuHeatmap = memo(function PlayerDanmakuHeatmap({
   height = 24,
   numBuckets = 60,
   idPrefix,
+  dragRatio,
 }: PlayerDanmakuHeatmapProps) {
   const autoId = useId().replace(/[^a-zA-Z0-9_-]/g, '')
-  const gradId = idPrefix ? `${idPrefix}-grad` : `kz-hm-grad-${autoId}`
+  const curveClipId = idPrefix ? `${idPrefix}-curve` : `kz-hm-curve-${autoId}`
+  const unplayedGradId = idPrefix ? `${idPrefix}-unplayed` : `kz-hm-unplayed-${autoId}`
+  const playedGradId = idPrefix ? `${idPrefix}-played` : `kz-hm-played-${autoId}`
+
+  const progress = usePlayerProgress()
+  const effectiveProgress =
+    dragRatio !== null && dragRatio !== undefined ? dragRatio * 100 : progress
 
   const heatmapPath = useMemo(
     () => computeDanmakuHeatmap(comments, duration, numBuckets, height),
@@ -146,12 +171,52 @@ export const PlayerDanmakuHeatmap = memo(function PlayerDanmakuHeatmap({
       aria-hidden="true"
     >
       <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(56, 189, 248, 0.45)" />
-          <stop offset="100%" stopColor="rgba(56, 189, 248, 0.02)" />
+        <clipPath id={curveClipId}>
+          <path d={heatmapPath} />
+        </clipPath>
+        {/* 未播放部分：柔和白色半透明垂直渐变 */}
+        <linearGradient id={unplayedGradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(255, 255, 255, 0.35)" />
+          <stop offset="100%" stopColor="rgba(255, 255, 255, 0.08)" />
+        </linearGradient>
+        {/* 已播放部分：主题青蓝色高亮垂直渐变 */}
+        <linearGradient id={playedGradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(56, 189, 248, 0.7)" />
+          <stop offset="100%" stopColor="rgba(56, 189, 248, 0.18)" />
         </linearGradient>
       </defs>
-      <path d={heatmapPath} fill={`url(#${gradId})`} />
+      <g clipPath={`url(#${curveClipId})`}>
+        {/* 未播放底层波浪 */}
+        <rect
+          x="0"
+          y="0"
+          width="100"
+          height={height}
+          fill={`url(#${unplayedGradId})`}
+        />
+        {/* 已播放高亮波浪（随播放进度或拖拽实时延展推进） */}
+        {effectiveProgress > 0 && (
+          <rect
+            x="0"
+            y="0"
+            width={effectiveProgress}
+            height={height}
+            fill={`url(#${playedGradId})`}
+          />
+        )}
+        {/* 播放位置垂直微光线 */}
+        {effectiveProgress > 0 && effectiveProgress < 100 && (
+          <line
+            x1={effectiveProgress}
+            x2={effectiveProgress}
+            y1="0"
+            y2={height}
+            stroke="rgba(255, 255, 255, 0.6)"
+            strokeWidth="1"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+      </g>
     </svg>
   )
 })

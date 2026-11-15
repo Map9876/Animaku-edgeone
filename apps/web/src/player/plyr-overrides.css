@@ -576,6 +576,56 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
   transform: translate(-50%, -50%) scale(0.96);
 }
 
+/* Bilibili-style Corner Pause Indicator (Cat Ear TV Badge) */
+.kz-corner-pause {
+  position: absolute;
+  right: 1.75rem;
+  bottom: calc((var(--kz-ctrl-h, 32px) + 1.25rem) * 1.5);
+  z-index: 25;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  filter: drop-shadow(0 3px 12px rgba(0, 0, 0, 0.42));
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), filter 0.22s ease, opacity 0.2s ease;
+  animation: kz-corner-pause-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kz-corner-pause:hover {
+  transform: scale(1.08) translateY(-2px);
+  filter: drop-shadow(0 6px 20px rgba(0, 174, 236, 0.55)) drop-shadow(0 3px 10px rgba(0, 0, 0, 0.45));
+}
+
+.kz-corner-pause:active {
+  transform: scale(0.94);
+}
+
+@keyframes kz-corner-pause-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@container kz-player (max-width: 600px) {
+  .kz-corner-pause {
+    right: 1rem;
+    bottom: calc((var(--kz-ctrl-h, 32px) + 0.75rem) * 1.5);
+    width: 52px;
+    height: 52px;
+  }
+}
+
 /* Modern Floating Next-Episode Countdown Toast */
 .kz-countdown-layer {
   position: absolute;
@@ -862,7 +912,7 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
   --kz-progress: 0%;
   --kz-seek-fill: #38bdf8;
   --kz-seek-rest: rgba(255, 255, 255, 0.25);
-  --kz-seek-h: 4px;
+  --kz-seek-h: 3px;
   display: flex;
   align-items: center;
   position: relative;
@@ -875,8 +925,9 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
   pointer-events: none;
 }
 
-.kz-seek-wrap:hover .kz-seek {
-  --kz-seek-h: 6px;
+.kz-seek-wrap:hover .kz-seek,
+.kz-seek-wrap[data-dragging='true'] .kz-seek {
+  --kz-seek-h: 5px;
 }
 
 .kz-seek-track {
@@ -886,7 +937,7 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
   border-radius: 999px;
   background: var(--kz-seek-rest);
   overflow: hidden;
-  transition: height 0.15s ease;
+  transition: height 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .kz-seek-played {
@@ -904,15 +955,19 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-  transform: translate(-50%, -50%) scale(1);
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+  transform: translate(-50%, -50%) scale(0);
+  opacity: 0;
   pointer-events: none;
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.kz-seek-wrap:hover .kz-seek-thumb {
-  transform: translate(-50%, -50%) scale(1.25);
+.kz-seek-wrap:hover .kz-seek-thumb,
+.kz-seek-wrap[data-dragging='true'] .kz-seek-thumb {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.15);
   background: #ffffff;
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.7), 0 0 0 2px rgba(255, 255, 255, 0.9);
 }
@@ -992,7 +1047,10 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
   letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .kz-ctrl-icon {
@@ -1008,7 +1066,7 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
   height: 20px;
   margin: 0;
   flex: none;
-  transition: transform 0.15s ease;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .kz-danmaku-wrap .kz-ctrl-icon svg,
@@ -1018,7 +1076,12 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
 }
 
 .kz-ctrl:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.kz-bar-left .kz-ctrl:hover {
+  color: var(--brand_blue, #00AEEC);
 }
 
 .kz-ctrl:disabled {
@@ -1028,16 +1091,39 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
 }
 
 .kz-ctrl:active {
-  transform: scale(0.95);
+  transform: scale(0.85);
+  transition-duration: 0.08s;
+}
+
+@keyframes kz-spring-pop {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(0.78);
+  }
+  60% {
+    transform: scale(1.18);
+  }
+  80% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.kz-ctrl-icon:active svg {
+  animation: kz-spring-pop 0.32s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .kz-ctrl[data-active='true'] {
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.16);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .kz-ctrl[data-active='true']:hover {
-  background: rgba(56, 189, 248, 0.24);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .kz-time {
@@ -1061,112 +1147,182 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
 }
 
 /*
- * Volume — speaker icon (mute toggle) + decorative rail.
- * Native <input type=range> is transparent (hit-testing + thumb only).
+ * Volume — Bilibili-style vertical hover popover + safe wheel interaction.
+ * Compact speaker button in the bar; hovering reveals the vertical slider.
  */
 .kz-vol-wrap {
-  display: flex;
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
   height: var(--kz-ctrl-h);
-  margin: 0 4px;
+  margin: 0 1px;
 }
 
 .kz-vol-btn {
   flex-shrink: 0;
 }
 
-.kz-vol-slider {
-  position: relative;
-  width: 72px;
-  height: var(--kz-ctrl-h);
+.kz-vol-box {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(6px) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 100 !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 34px;
+  min-width: 34px;
+  max-width: 34px;
+  padding: 10px 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(21, 21, 21, 0.92);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition:
+    opacity 0.18s ease,
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
 }
 
-.kz-vol-rail {
+/* Invisible bridge so mouse moving from button to box doesn't close panel */
+.kz-vol-box::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: -4px;
+  right: -4px;
+  height: 12px;
+  background: transparent;
+}
+
+.kz-vol-wrap:hover .kz-vol-box,
+.kz-vol-box[data-open='true'] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+.kz-vol-number {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: #ffffff;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.kz-vol-slider-vertical {
+  position: relative;
+  width: 24px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kz-vol-rail-vertical {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.kz-vol-fill-vertical {
   position: absolute;
   left: 0;
   right: 0;
-  top: 50%;
-  height: 3px;
-  margin: 0;
-  transform: translateY(-50%);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.25);
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.kz-vol-fill {
-  height: 100%;
+  bottom: 0;
+  width: 100%;
   border-radius: 999px;
   background: #38bdf8;
   pointer-events: none;
 }
 
-.kz-vol {
+.kz-vol-range-vertical {
   position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
+  left: 50%;
+  top: 50%;
+  width: 80px;
+  height: 24px;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
+  cursor: pointer;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  transform-origin: center;
   z-index: 1;
+  outline: none;
 }
 
-/* Hide native track completely — we draw .kz-vol-rail ourselves */
-.kz-vol::-webkit-slider-runnable-track {
-  height: 100%;
+.kz-vol-range-vertical::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 24px;
   background: transparent;
   border: 0;
 }
 
-.kz-vol::-webkit-slider-thumb {
+.kz-vol-range-vertical::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 12px;
   height: 12px;
-  /* Center thumb in the full 32px input → sits on mid-line with the rail */
-  margin-top: calc((32px - 12px) / 2);
+  margin-top: 6px;
   border: 0;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
-  cursor: pointer;
-  position: relative;
-  z-index: 2;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow:
+    0 0 4px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 0, 0, 0.2);
+  transition:
+    transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.15s ease;
 }
 
-.kz-vol:hover::-webkit-slider-thumb {
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.6), 0 0 0 1.5px rgba(255, 255, 255, 0.9);
+.kz-vol-range-vertical:hover::-webkit-slider-thumb,
+.kz-vol-range-vertical:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+  box-shadow:
+    0 0 8px rgba(56, 189, 248, 0.8),
+    0 0 0 1.5px rgba(255, 255, 255, 0.9);
 }
 
-.kz-vol::-moz-range-track {
-  height: 100%;
+.kz-vol-range-vertical::-moz-range-track {
+  width: 100%;
+  height: 24px;
   background: transparent;
   border: 0;
 }
 
-.kz-vol::-moz-range-progress {
-  height: 100%;
+.kz-vol-range-vertical::-moz-range-progress {
   background: transparent;
-  border: 0;
 }
 
-.kz-vol::-moz-range-thumb {
+.kz-vol-range-vertical::-moz-range-thumb {
   width: 12px;
   height: 12px;
   border: 0;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
-  cursor: pointer;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
 }
 
 .kz-speed-wrap {

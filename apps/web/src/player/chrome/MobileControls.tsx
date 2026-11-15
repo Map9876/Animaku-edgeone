@@ -408,6 +408,7 @@ export function MobileControls(props: PlayerControlsProps) {
             duration={duration}
             height={20}
             numBuckets={50}
+            dragRatio={dragRatio}
           />
 
           {/* OP/ED Chapter Markers */}
