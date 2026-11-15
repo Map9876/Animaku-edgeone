@@ -439,6 +439,9 @@ bangumiRoutes.post('/search', async (c) => {
 
 bangumiRoutes.get('/subjects/:id', async (c) => {
   const id = c.req.param('id')
+  if (!/^\d+$/.test(id)) {
+    return c.json({ error: 'bad_request', message: '条目 ID 必须为纯数字' }, 400)
+  }
   const key = `bangumi:${apiHost}:subject:${id}`
   const bypass = wantsCacheBypass(c)
   if (bypass) cacheDelete(key)
@@ -462,6 +465,9 @@ bangumiRoutes.get('/subjects/:id', async (c) => {
 
 bangumiRoutes.get('/subjects/:id/episodes', async (c) => {
   const id = c.req.param('id')
+  if (!/^\d+$/.test(id)) {
+    return c.json({ error: 'bad_request', message: '条目 ID 必须为纯数字' }, 400)
+  }
   const limit = c.req.query('limit') || '200'
   const offset = c.req.query('offset') || '0'
   const type = c.req.query('type') || ''
@@ -574,6 +580,9 @@ bangumiRoutes.put('/collections/:subjectId', async (c) => {
   const token = tokenFrom(c)
   if (!token) return c.json({ error: 'unauthorized', message: '缺少 Access Token' }, 401)
   const subjectId = c.req.param('subjectId')
+  if (!/^\d+$/.test(subjectId)) {
+    return c.json({ error: 'bad_request', message: 'subjectId 必须为纯数字' }, 400)
+  }
   const body = await c.req.json<{ type: CollectType }>()
   const bgmType = toBangumiCollectionType(body.type)
   if (bgmType == null) {
@@ -614,6 +623,9 @@ bangumiRoutes.get('/collections/:subjectId', async (c) => {
   const token = tokenFrom(c)
   if (!token) return c.json({ error: 'unauthorized', message: '缺少 Access Token' }, 401)
   const subjectId = c.req.param('subjectId')
+  if (!/^\d+$/.test(subjectId)) {
+    return c.json({ error: 'bad_request', message: 'subjectId 必须为纯数字' }, 400)
+  }
   const username = await getUsernameForToken(token)
   if (!username) {
     return c.json({ error: 'unauthorized', message: '无法获取用户信息或 Access Token 无效' }, 401)

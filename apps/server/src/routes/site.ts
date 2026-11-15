@@ -170,9 +170,9 @@ adminSiteRoutes.use('*', async (c, next) => {
       {
         ok: false,
         error: 'unauthorized',
-        message: '管理员鉴权失败：请提供有效的 X-Admin-Secret 或仅在本机回环访问',
+        message: '管理接口未启用或凭据无效，请设置并在请求头提供 X-Admin-Secret',
       },
-      401,
+      403,
     )
   }
   await next()

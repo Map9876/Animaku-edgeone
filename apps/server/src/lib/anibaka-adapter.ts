@@ -13,6 +13,7 @@ import * as cheerio from 'cheerio'
 import { config } from '../config'
 import { fetchPublic, isPrivateHost } from './private-host'
 import { simplifiedToTraditional } from './opencc-s2t'
+import { readTextLimited } from './http'
 
 export { isAnxRule }
 
@@ -360,7 +361,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
         ctx.value = ''
         return
       }
-      ctx.value = await res.text()
+      ctx.value = await readTextLimited(res, 2_500_000, 'anibaka-fetch')
       ctx.pageUrl = url
     } catch (e) {
       console.warn(`[anibaka-adapter] fetch 失败: ${url}`, e)
@@ -1036,7 +1037,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
       try {
         const res = await fetchPublic(url, { headers }, { timeoutMs: 10_000, source: ctx.rule.name })
         if (!res.ok) continue
-        const text = await res.text()
+        const text = await readTextLimited(res, 2_500_000, 'anibaka-maccms')
         const json = asJson(text)
         const listPathStr = String(step.listPath ?? 'list')
         const found = jsonPath(json, listPathStr)
@@ -1075,7 +1076,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
     try {
       const res = await fetchPublic(url, {}, { timeoutMs: 10_000, source: ctx.rule.name })
       if (!res.ok) return
-      const text = await res.text()
+      const text = await readTextLimited(res, 2_500_000, 'anibaka-anime1-catalog')
       const catalog = JSON.parse(text)
       if (!Array.isArray(catalog)) return
 
@@ -1113,7 +1114,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
     try {
       const res = await fetchPublic(firstUrl, {}, { timeoutMs: 12_000, source: ctx.rule.name })
       if (!res.ok) return
-      const html = await res.text()
+      const html = await readTextLimited(res, 2_500_000, 'anibaka-anime1-detail')
       const $ = cheerio.load(html)
       const tokens: string[] = []
       $('video[data-apireq]').each((_, el) => {

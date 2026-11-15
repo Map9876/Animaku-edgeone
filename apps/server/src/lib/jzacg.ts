@@ -22,8 +22,10 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
+import { assertOwnSourceUrl } from './source-guard'
 
 export const JZACG_BASE_URL = 'https://www.jzacg.com'
+const JZACG_ALLOWED_HOSTS = ['jzacg.com', 'jzacg.top', 'jzacg.net']
 
 const JZACG_PARSE_MAP: Record<string, string> = {
   '2_': 'https://play.mknacg.top:8585/cloudplay/?url=',
@@ -191,7 +193,8 @@ export async function chaptersJzacg(
   source: string,
 ): Promise<PluginChapterResult> {
   const effectiveBase = (rule.baseURL || JZACG_BASE_URL).replace(/\/+$/, '')
-  const absDetailUrl = source.startsWith('http') ? source : `${effectiveBase}${source}`
+  const absDetailUrl = assertOwnSourceUrl(source, effectiveBase, JZACG_ALLOWED_HOSTS)
+  assertPublicHttpUrl(absDetailUrl)
 
   const res = await fetchWithRetry(absDetailUrl, {
     headers: getBaseHeaders(`${effectiveBase}/`),
@@ -410,7 +413,8 @@ export async function resolveJzacg(
   pageUrl: string,
 ): Promise<ResolvePlayResult> {
   const effectiveBase = (rule.baseURL || JZACG_BASE_URL).replace(/\/+$/, '')
-  const absPlayUrl = pageUrl.startsWith('http') ? pageUrl : `${effectiveBase}${pageUrl}`
+  const absPlayUrl = assertOwnSourceUrl(pageUrl, effectiveBase, JZACG_ALLOWED_HOSTS)
+  assertPublicHttpUrl(absPlayUrl)
 
   const res = await fetchWithRetry(absPlayUrl, {
     headers: getBaseHeaders(`${effectiveBase}/`),

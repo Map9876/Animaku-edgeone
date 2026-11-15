@@ -12,6 +12,7 @@ import type {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from '../lib/private-host'
+import { readTextLimited } from '../lib/http'
 
 /** Local copy to avoid circular import with rule-engine/index.ts */
 function normalizeEpisodeUrl(baseUrl: string, raw: string): string {
@@ -332,7 +333,7 @@ export async function executeApiRequest(
   if (!res.ok) {
     throw new ApiRuleError(`API 返回 ${res.status}: ${uri.toString()}`)
   }
-  const text = await res.text()
+  const text = await readTextLimited(res, 2_500_000, 'api-rule')
   try {
     return JSON.parse(text) as unknown
   } catch (e) {

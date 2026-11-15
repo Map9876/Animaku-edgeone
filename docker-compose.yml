@@ -64,7 +64,7 @@ services:
       # 日志格式（pretty 高可读彩显 / json 结构化日志）
       LOG_FORMAT: ${LOG_FORMAT:-pretty}
 
-      # 搜索引擎即时推送 (IndexNow) 与管理员密钥（公网建站选填）
+      # 搜索引擎即时推送 (IndexNow) 与管理员密钥（如需使用后台管理功能必须配置，未配置时管理接口完全禁用）
       INDEXNOW_ENABLED: ${INDEXNOW_ENABLED:-0}
       INDEXNOW_KEY: ${INDEXNOW_KEY:-}
       ADMIN_SECRET: ${ADMIN_SECRET:-}

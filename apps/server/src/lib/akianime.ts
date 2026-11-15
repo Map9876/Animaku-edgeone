@@ -26,6 +26,7 @@ import {
 import * as cheerio from 'cheerio'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
+import { assertOwnSourceUrl } from './source-guard'
 
 const AKIANIME_BASE_URL = 'https://www.akianime.cc'
 const ANIPLAYER_BASE_URL = 'https://aniplayer.xn--gmqr9gevarqk8t.cn'
@@ -163,11 +164,18 @@ export async function chaptersAkianime(
   rule: PluginRule,
   detailUrl: string,
 ): Promise<PluginChapterResult> {
-  assertPublicHttpUrl(detailUrl)
+  const baseUrl = rule.baseURL || AKIANIME_BASE_URL
+  const safeDetailUrl = assertOwnSourceUrl(detailUrl, baseUrl, [
+    'akianime.cc',
+    'akianime.com',
+    'akianime.site',
+    'akianime.top',
+  ])
+  assertPublicHttpUrl(safeDetailUrl)
 
   const res = await fetchPublic(
-    detailUrl,
-    { headers: getBaseHeaders(detailUrl) },
+    safeDetailUrl,
+    { headers: getBaseHeaders(safeDetailUrl) },
     { timeoutMs: 12_000, source: 'akianime' },
   )
 
@@ -286,14 +294,21 @@ interface AniplayerApiResponse {
  * - 针对直接暴露的 M3U8/MP4 线路，直接返回
  */
 export async function resolveAkianime(
-  _rule: PluginRule,
+  rule: PluginRule,
   episodeUrl: string,
 ): Promise<ResolvePlayResult> {
-  assertPublicHttpUrl(episodeUrl)
+  const baseUrl = rule.baseURL || AKIANIME_BASE_URL
+  const safeEpisodeUrl = assertOwnSourceUrl(episodeUrl, baseUrl, [
+    'akianime.cc',
+    'akianime.com',
+    'akianime.site',
+    'akianime.top',
+  ])
+  assertPublicHttpUrl(safeEpisodeUrl)
 
   const res = await fetchPublic(
-    episodeUrl,
-    { headers: getBaseHeaders(episodeUrl) },
+    safeEpisodeUrl,
+    { headers: getBaseHeaders(safeEpisodeUrl) },
     { timeoutMs: 12_000, source: 'akianime' },
   )
 

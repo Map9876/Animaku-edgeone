@@ -73,3 +73,56 @@ export function getBearerToken(authHeader: string | undefined): string | null {
   const m = authHeader.match(/^Bearer\s+(.+)$/i)
   return m ? m[1].trim() : null
 }
+
+export const DEFAULT_BODY_MAX_BYTES = 2_500_000
+
+/**
+ * 流式读取 HTTP 响应体文本，并严格执行字节数上限。
+ * 若超过上限则立即中断 (cancel) 响应体，释放 socket 并抛错，防止 OOM 内存耗尽。
+ */
+export async function readTextLimited(
+  res: Response,
+  maxBytes: number = DEFAULT_BODY_MAX_BYTES,
+  label: string = 'http',
+): Promise<string> {
+  const cl = res.headers.get('content-length')
+  if (cl) {
+    const n = Number(cl)
+    if (Number.isFinite(n) && n > maxBytes) {
+      try {
+        await res.body?.cancel()
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`${label} 响应过大 (${n} > ${maxBytes} bytes)`)
+    }
+  }
+
+  if (!res.body) return res.text()
+
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (!value?.byteLength) continue
+    total += value.byteLength
+    if (total > maxBytes) {
+      try {
+        await reader.cancel()
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`${label} 响应过大 (>${maxBytes} bytes)`)
+    }
+    chunks.push(value)
+  }
+  const merged = new Uint8Array(total)
+  let offset = 0
+  for (const c of chunks) {
+    merged.set(c, offset)
+    offset += c.byteLength
+  }
+  return new TextDecoder('utf-8', { fatal: false }).decode(merged)
+}

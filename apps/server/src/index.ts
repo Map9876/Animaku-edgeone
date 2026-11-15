@@ -137,7 +137,7 @@ app.get('/api/health', (c) =>
 
 /**
  * Admin endpoint: submit sitemap URLs or specific custom URLs to IndexNow.
- * Requires administrator authentication (X-Admin-Secret) or loopback access.
+ * Requires administrator authentication (X-Admin-Secret).
  */
 app.post('/api/admin/indexnow', async (c) => {
   if (!isAuthorizedAdmin(c)) {
@@ -145,7 +145,7 @@ app.post('/api/admin/indexnow', async (c) => {
       {
         ok: false,
         error: 'unauthorized',
-        message: '需要管理员鉴权（X-Admin-Secret）或本机回环访问',
+        message: '管理接口未启用或凭据无效，请设置并在请求头提供 X-Admin-Secret',
       },
       403,
     )

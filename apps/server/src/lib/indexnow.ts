@@ -1,9 +1,8 @@
+import { createHash, timingSafeEqual } from 'node:crypto'
 import type { Context } from 'hono'
 import type { BangumiItem } from '@animaku/shared'
 import { config } from '../config'
 import { isPrivateHost, fetchPublic } from './private-host'
-import { getClientIp } from './logger'
-import { clientRemoteAddress } from './access'
 import { fetchSitemapSubjects, SITEMAP_STATIC_PATHS } from './seo-static'
 
 const INDEXNOW_API = 'https://api.indexnow.org/IndexNow'
@@ -342,28 +341,28 @@ export async function submitFullSitemapToIndexNow(
 }
 
 /**
+ * Constant-time string comparison using SHA-256 digests.
+ * Prevents timing attacks and length disclosure.
+ */
+function safeSecretCompare(a: string, b: string): boolean {
+  if (!a || !b) return false
+  const hashA = createHash('sha256').update(a).digest()
+  const hashB = createHash('sha256').update(b).digest()
+  return timingSafeEqual(hashA, hashB)
+}
+
+/**
  * Check if the request is authorized as administrator for admin routes.
+ * Strictly requires ADMIN_SECRET to be configured and provided via X-Admin-Secret header.
+ * Loopback IPs and query string parameters are NOT accepted.
  */
 export function isAuthorizedAdmin(c: Context): boolean {
-  const secret = config.adminSecret
-  if (secret) {
-    const hdr = c.req.header('x-admin-secret') || ''
-    if (hdr && hdr === secret) return true
-    const q = c.req.query('secret') || ''
-    if (q && q === secret) return true
+  const secret = config.adminSecret?.trim()
+  if (!secret) {
+    // If no secret configured, admin endpoints are completely disabled
     return false
   }
 
-  // If no secret configured, allow loopback only
-  const ip = getClientIp(c.req)
-  const remoteAddr = clientRemoteAddress(c)
-  const isLoopback =
-    ip === '127.0.0.1' ||
-    ip === '::1' ||
-    ip === 'localhost' ||
-    remoteAddr === '127.0.0.1' ||
-    remoteAddr === '::1' ||
-    remoteAddr === 'localhost'
-
-  return isLoopback
+  const hdr = c.req.header('x-admin-secret')?.trim() || ''
+  return safeSecretCompare(hdr, secret)
 }

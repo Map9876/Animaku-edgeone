@@ -28,6 +28,7 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
+import { assertOwnSourceUrl } from './source-guard'
 
 const ANIMOE_DEFAULT_BASE_URL = 'https://animoe.org'
 
@@ -167,10 +168,11 @@ export async function chaptersAnimoe(
   source: string,
 ): Promise<PluginChapterResult> {
   const baseUrl = getBaseUrl(rule)
-  let detailUrl = source.trim()
-  if (!detailUrl.startsWith('http')) {
-    detailUrl = `${baseUrl}${detailUrl.startsWith('/') ? '' : '/'}${detailUrl}`
-  }
+  const detailUrl = assertOwnSourceUrl(source, baseUrl, [
+    'animoe.org',
+    'animoe.net',
+    'animoe.me',
+  ])
   assertPublicHttpUrl(detailUrl)
 
   const res = await fetchPublic(
@@ -303,9 +305,11 @@ export async function resolveAnimoe(
   pageUrl: string,
 ): Promise<ResolvePlayResult> {
   const baseUrl = getBaseUrl(rule)
-  const absPlayUrl = pageUrl.startsWith('http')
-    ? pageUrl
-    : `${baseUrl}${pageUrl.startsWith('/') ? '' : '/'}${pageUrl}`
+  const absPlayUrl = assertOwnSourceUrl(pageUrl, baseUrl, [
+    'animoe.org',
+    'animoe.net',
+    'animoe.me',
+  ])
   assertPublicHttpUrl(absPlayUrl)
 
   const res = await fetchPublic(

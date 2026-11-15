@@ -1,10 +1,52 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { parseDanmakuComments } from '@animaku/shared'
 import { dandanGet, isDanmakuUsingFallback } from '../lib/dandan'
 import { setDanmakuCdnHeaders } from '../lib/cdn-cache-headers'
 import { cacheGetOrSet, wantsCacheBypass } from '../lib/ttl-cache'
+import { getClientIp } from '../lib/logger'
+import {
+  checkSourceRateLimit,
+  SourceRateLimitError,
+} from '../lib/source-rate-limit'
 
 export const danmakuRoutes = new Hono()
+
+const danmakuBypassCooldownMap = new Map<string, number>()
+const DANMAKU_BYPASS_COOLDOWN_MS = 30_000
+
+function shouldAllowBypass(cacheKey: string, requestedBypass: boolean): boolean {
+  if (!requestedBypass) return false
+  const now = Date.now()
+  const lastTime = danmakuBypassCooldownMap.get(cacheKey) || 0
+  if (now - lastTime < DANMAKU_BYPASS_COOLDOWN_MS) {
+    return false // 30s 冷却内静默忽略 bypass，走缓存
+  }
+  danmakuBypassCooldownMap.set(cacheKey, now)
+  return true
+}
+
+function guardDanmakuOutbound(c: Context) {
+  const clientIp = getClientIp(c.req)
+  const rateLimit = checkSourceRateLimit(clientIp, 'dandan', 'danmaku')
+  if (!rateLimit.allowed) {
+    throw new SourceRateLimitError({
+      retryAfterSec: rateLimit.retryAfterSec,
+      limit: rateLimit.limit,
+      kind: 'danmaku',
+      upstreamKey: 'dandan',
+    })
+  }
+}
+
+const danmakuCooldownPruneTimer = setInterval(() => {
+  const now = Date.now()
+  for (const [key, timestamp] of danmakuBypassCooldownMap.entries()) {
+    if (now - timestamp >= DANMAKU_BYPASS_COOLDOWN_MS) {
+      danmakuBypassCooldownMap.delete(key)
+    }
+  }
+}, DANMAKU_BYPASS_COOLDOWN_MS)
+danmakuCooldownPruneTimer.unref?.()
 
 const DANMAKU_CACHE_TTL = {
   /** Anime subject metadata & episode list (12 hours) */
@@ -26,12 +68,14 @@ danmakuRoutes.get('/status', (c) =>
 danmakuRoutes.get('/search', async (c) => {
   const keyword = (c.req.query('keyword') || '').trim()
   if (!keyword) return c.json({ error: 'bad_request', message: '缺少 keyword' }, 400)
-  const bypass = wantsCacheBypass(c)
+  const cacheKey = `dandan:search:${keyword.toLowerCase()}`
+  const bypass = shouldAllowBypass(cacheKey, wantsCacheBypass(c))
   try {
     const { value: animes, hit } = await cacheGetOrSet(
-      `dandan:search:${keyword.toLowerCase()}`,
+      cacheKey,
       DANMAKU_CACHE_TTL.search,
       async () => {
+        guardDanmakuOutbound(c)
         const json = (await dandanGet('/api/v2/search/anime', { keyword })) as {
           success?: boolean
           errorMessage?: string
@@ -56,6 +100,13 @@ danmakuRoutes.get('/search', async (c) => {
     setDanmakuCdnHeaders(c, bypass)
     return c.json({ data: animes })
   } catch (e) {
+    if (e instanceof SourceRateLimitError) {
+      c.header('Retry-After', String(e.retryAfterSec))
+      return c.json(
+        { error: 'rate_limited', message: e.message, retryAfter: e.retryAfterSec },
+        429,
+      )
+    }
     return c.json(
       { error: 'upstream', message: e instanceof Error ? e.message : String(e) },
       502,
@@ -65,12 +116,17 @@ danmakuRoutes.get('/search', async (c) => {
 
 danmakuRoutes.get('/bangumi/bgmtv/:bgmId', async (c) => {
   const bgmId = c.req.param('bgmId')
-  const bypass = wantsCacheBypass(c)
+  if (!/^\d+$/.test(bgmId)) {
+    return c.json({ error: 'bad_request', message: 'bgmId 必须为纯数字' }, 400)
+  }
+  const cacheKey = `dandan:bgmtv:${bgmId}`
+  const bypass = shouldAllowBypass(cacheKey, wantsCacheBypass(c))
   try {
     const { value: result, hit } = await cacheGetOrSet(
-      `dandan:bgmtv:${bgmId}`,
+      cacheKey,
       DANMAKU_CACHE_TTL.subject,
       async () => {
+        guardDanmakuOutbound(c)
         const json = (await dandanGet(`/api/v2/bangumi/bgmtv/${bgmId}`)) as {
           success?: boolean
           errorCode?: number
@@ -110,6 +166,13 @@ danmakuRoutes.get('/bangumi/bgmtv/:bgmId', async (c) => {
     setDanmakuCdnHeaders(c, bypass)
     return c.json({ data: result })
   } catch (e) {
+    if (e instanceof SourceRateLimitError) {
+      c.header('Retry-After', String(e.retryAfterSec))
+      return c.json(
+        { error: 'rate_limited', message: e.message, retryAfter: e.retryAfterSec },
+        429,
+      )
+    }
     return c.json(
       { error: 'upstream', message: e instanceof Error ? e.message : String(e) },
       502,
@@ -119,12 +182,17 @@ danmakuRoutes.get('/bangumi/bgmtv/:bgmId', async (c) => {
 
 danmakuRoutes.get('/bangumi/:id', async (c) => {
   const id = c.req.param('id')
-  const bypass = wantsCacheBypass(c)
+  if (!/^\d+$/.test(id)) {
+    return c.json({ error: 'bad_request', message: 'id 必须为纯数字' }, 400)
+  }
+  const cacheKey = `dandan:bangumi:${id}`
+  const bypass = shouldAllowBypass(cacheKey, wantsCacheBypass(c))
   try {
     const { value: result, hit } = await cacheGetOrSet(
-      `dandan:bangumi:${id}`,
+      cacheKey,
       DANMAKU_CACHE_TTL.subject,
       async () => {
+        guardDanmakuOutbound(c)
         const json = (await dandanGet(`/api/v2/bangumi/${id}`)) as {
           success?: boolean
           errorCode?: number
@@ -155,6 +223,13 @@ danmakuRoutes.get('/bangumi/:id', async (c) => {
     setDanmakuCdnHeaders(c, bypass)
     return c.json({ data: result })
   } catch (e) {
+    if (e instanceof SourceRateLimitError) {
+      c.header('Retry-After', String(e.retryAfterSec))
+      return c.json(
+        { error: 'rate_limited', message: e.message, retryAfter: e.retryAfterSec },
+        429,
+      )
+    }
     return c.json(
       { error: 'upstream', message: e instanceof Error ? e.message : String(e) },
       502,
@@ -164,14 +239,19 @@ danmakuRoutes.get('/bangumi/:id', async (c) => {
 
 danmakuRoutes.get('/comment/:episodeId', async (c) => {
   const episodeId = c.req.param('episodeId')
+  if (!/^\d+$/.test(episodeId)) {
+    return c.json({ error: 'bad_request', message: 'episodeId 必须为纯数字' }, 400)
+  }
   const withRelated = c.req.query('withRelated') ?? 'true'
   const chConvert = c.req.query('chConvert') ?? '1'
-  const bypass = wantsCacheBypass(c)
+  const cacheKey = `dandan:comment:${episodeId}:${withRelated}:${chConvert}`
+  const bypass = shouldAllowBypass(cacheKey, wantsCacheBypass(c))
   try {
     const { value: result, hit } = await cacheGetOrSet(
-      `dandan:comment:${episodeId}:${withRelated}:${chConvert}`,
+      cacheKey,
       DANMAKU_CACHE_TTL.comments,
       async () => {
+        guardDanmakuOutbound(c)
         const json = (await dandanGet(`/api/v2/comment/${episodeId}`, {
           withRelated,
           chConvert,
@@ -188,6 +268,13 @@ danmakuRoutes.get('/comment/:episodeId', async (c) => {
     setDanmakuCdnHeaders(c, bypass)
     return c.json({ data: result.comments, count: result.count })
   } catch (e) {
+    if (e instanceof SourceRateLimitError) {
+      c.header('Retry-After', String(e.retryAfterSec))
+      return c.json(
+        { error: 'rate_limited', message: e.message, retryAfter: e.retryAfterSec },
+        429,
+      )
+    }
     return c.json(
       { error: 'upstream', message: e instanceof Error ? e.message : String(e) },
       502,

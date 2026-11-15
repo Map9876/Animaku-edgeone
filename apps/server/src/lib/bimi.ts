@@ -34,8 +34,19 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
+import { assertOwnSourceUrl } from './source-guard'
 
 const BIMI_DEFAULT_BASE_URL = 'https://www.bimiacg14.net'
+const BIMI_ALLOWED_HOSTS = [
+  'bimiacg14.net',
+  'bimiacg4.net',
+  'bimiacg.net',
+  'bimiacg.com',
+  'bimiacg10.net',
+  'bimiacg11.net',
+  'bimibimi.cc',
+  'bimibimi.net',
+]
 
 export function isBimiRule(rule: PluginRule): boolean {
   const name = (rule.name || '').toLowerCase().trim()
@@ -165,16 +176,17 @@ export async function chaptersBimi(
   source: string,
 ): Promise<PluginChapterResult> {
   const baseUrl = getBaseUrl(rule)
-  let detailUrl = source.trim()
-  if (!/^https?:\/\//i.test(detailUrl)) {
-    const idMatch = detailUrl.match(/\d+/)
+  let raw = source.trim()
+  if (!/^https?:\/\//i.test(raw)) {
+    const idMatch = raw.match(/\d+/)
     if (idMatch) {
-      detailUrl = `${baseUrl}/bangumi/bi/${idMatch[0]}/`
+      raw = `/bangumi/bi/${idMatch[0]}/`
     } else {
-      detailUrl = `${baseUrl}/bangumi/bi/${detailUrl}/`
+      raw = `/bangumi/bi/${raw}/`
     }
   }
 
+  const detailUrl = assertOwnSourceUrl(raw, baseUrl, BIMI_ALLOWED_HOSTS)
   assertPublicHttpUrl(detailUrl)
 
   const res = await fetchPublic(
@@ -288,11 +300,7 @@ export async function resolveBimiPlayUrl(
   pageUrl: string,
 ): Promise<ResolvePlayResult> {
   const baseUrl = getBaseUrl(rule)
-  let playPageUrl = pageUrl.trim()
-  if (!/^https?:\/\//i.test(playPageUrl)) {
-    playPageUrl = `${baseUrl}${playPageUrl.startsWith('/') ? '' : '/'}${playPageUrl}`
-  }
-
+  const playPageUrl = assertOwnSourceUrl(pageUrl, baseUrl, BIMI_ALLOWED_HOSTS)
   assertPublicHttpUrl(playPageUrl)
 
   // Step 1: Request play page to obtain session cookie and embed token

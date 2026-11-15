@@ -30,8 +30,10 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
+import { assertOwnSourceUrl } from './source-guard'
 
 const MIFUN_DEFAULT_BASE_URL = 'https://ios.mifun.org'
+const MIFUN_ALLOWED_HOSTS = ['mifun.org', 'mifun.cc', 'mifun.tv']
 const RESOLVER_BASE_URL = 'https://data.m3u8.in/player'
 
 export function isMifunRule(rule: PluginRule): boolean {
@@ -210,10 +212,7 @@ export async function chaptersMifun(
   source: string,
 ): Promise<PluginChapterResult> {
   const baseUrl = getBaseUrl(rule)
-  let detailUrl = source.trim()
-  if (!detailUrl.startsWith('http')) {
-    detailUrl = `${baseUrl}${detailUrl.startsWith('/') ? '' : '/'}${detailUrl}`
-  }
+  const detailUrl = assertOwnSourceUrl(source, baseUrl, MIFUN_ALLOWED_HOSTS)
   assertPublicHttpUrl(detailUrl)
 
   const res = await fetchPublic(
@@ -346,9 +345,7 @@ export async function resolveMifun(
   pageUrl: string,
 ): Promise<ResolvePlayResult> {
   const baseUrl = getBaseUrl(rule)
-  const absPlayUrl = pageUrl.startsWith('http')
-    ? pageUrl
-    : `${baseUrl}${pageUrl.startsWith('/') ? '' : '/'}${pageUrl}`
+  const absPlayUrl = assertOwnSourceUrl(pageUrl, baseUrl, MIFUN_ALLOWED_HOSTS)
   assertPublicHttpUrl(absPlayUrl)
 
   const res = await fetchPublic(

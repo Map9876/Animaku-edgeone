@@ -19,8 +19,10 @@ import {
 import { config } from '../config'
 import { fetchPublic } from './private-host'
 import { keywordVariantsZh } from './opencc-s2t'
+import { assertOwnSourceUrl } from './source-guard'
 
 const SITE = 'https://anime1.me'
+const ANIME1_ALLOWED_HOSTS = ['anime1.me', 'v.anime1.me']
 const API = 'https://v.anime1.me/api'
 const UA = config.defaultUserAgent
 
@@ -319,15 +321,20 @@ export async function chaptersAnime1(
   source: string,
 ): Promise<PluginChapterResult> {
   const diagnostics: string[] = []
+  const effectiveSite = rule.baseURL || SITE
   let url = source.trim()
-  if (/^\d+$/.test(url)) url = `${SITE}/?cat=${url}`
-  else if (url.includes('anime1.me') && !url.includes('cat=') && !url.includes('/category/')) {
+  if (/^\d+$/.test(url)) {
+    url = `${effectiveSite}/?cat=${url}`
+  } else {
+    url = assertOwnSourceUrl(url, effectiveSite, ANIME1_ALLOWED_HOSTS)
+  }
+  if (!url.includes('cat=') && !url.includes('/category/')) {
     // single episode → promote to cat if possible
     try {
-      const html = await fetchText(url, { referer: SITE + '/' })
+      const html = await fetchText(url, { referer: effectiveSite + '/' })
       const catId = extractCatId(html)
       if (catId) {
-        url = `${SITE}/?cat=${catId}`
+        url = `${effectiveSite}/?cat=${catId}`
         diagnostics.push(`从单集提升为 cat=${catId}`)
       }
     } catch {
@@ -434,10 +441,11 @@ export async function resolveAnime1(
   pageUrl: string,
 ): Promise<ResolvePlayResult> {
   const diagnostics: string[] = []
-  const abs = absUrl(pageUrl, rule.baseURL || SITE)
+  const effectiveSite = rule.baseURL || SITE
+  const abs = assertOwnSourceUrl(pageUrl, effectiveSite, ANIME1_ALLOWED_HOSTS)
   diagnostics.push(`集页 ${abs}`)
 
-  const html = await fetchText(abs, { referer: SITE + '/' })
+  const html = await fetchText(abs, { referer: effectiveSite + '/' })
   const apireqMatch = html.match(/data-apireq=["']([^"']+)["']/i)
   if (!apireqMatch) {
     throw new Error(

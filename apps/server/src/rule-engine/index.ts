@@ -113,56 +113,8 @@ function nodeAttr(node: Node | null | undefined, name: string): string {
   return ''
 }
 
-/** Reject pathological HTML/JSON bodies that would blow Node heap */
-const MAX_HTML_BYTES = 2_500_000
-
-async function readTextLimited(
-  res: Response,
-  maxBytes: number,
-  label: string,
-): Promise<string> {
-  const cl = res.headers.get('content-length')
-  if (cl) {
-    const n = Number(cl)
-    if (Number.isFinite(n) && n > maxBytes) {
-      // Consume/cancel body so connection can reuse
-      try {
-        await res.body?.cancel()
-      } catch {
-        /* ignore */
-      }
-      throw new Error(`${label} 响应过大 (${n} > ${maxBytes} bytes)`)
-    }
-  }
-
-  if (!res.body) return res.text()
-
-  const reader = res.body.getReader()
-  const chunks: Uint8Array[] = []
-  let total = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    if (!value?.byteLength) continue
-    total += value.byteLength
-    if (total > maxBytes) {
-      try {
-        await reader.cancel()
-      } catch {
-        /* ignore */
-      }
-      throw new Error(`${label} 响应过大 (>${maxBytes} bytes)`)
-    }
-    chunks.push(value)
-  }
-  const merged = new Uint8Array(total)
-  let offset = 0
-  for (const c of chunks) {
-    merged.set(c, offset)
-    offset += c.byteLength
-  }
-  return new TextDecoder('utf-8', { fatal: false }).decode(merged)
-}
+import { readTextLimited, DEFAULT_BODY_MAX_BYTES as MAX_HTML_BYTES } from '../lib/http'
+export { readTextLimited, MAX_HTML_BYTES }
 
 export async function fetchHtml(
   url: string,

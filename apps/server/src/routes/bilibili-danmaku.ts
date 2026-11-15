@@ -64,28 +64,32 @@ async function resolveMediaIdToSeasonId(mediaId: number): Promise<number | null>
 
 /** Resolve b23.tv short link to final target */
 async function resolveB23ShortLink(shortUrl: string): Promise<BilibiliTarget | null> {
+  const match = shortUrl.match(/^(?:https?:\/\/)?(?:www\.)?b23\.tv\/([A-Za-z0-9_-]+)/i)
+  if (!match) return null
+  const safeShortUrl = `https://b23.tv/${encodeURIComponent(match[1])}`
+
   try {
-    const res = await bilibiliFetch(shortUrl, { redirect: 'manual' })
+    const res = await bilibiliFetch(safeShortUrl, { redirect: 'manual' })
     const location = res.headers.get('location') || res.url
     try {
       await res.body?.cancel()
     } catch {
       /* ignore */
     }
-    if (location && location !== shortUrl) {
+    if (location && location !== safeShortUrl) {
       return parseBilibiliInput(location)
     }
   } catch {
     /* fallback to follow redirect */
     try {
-      const res = await bilibiliFetch(shortUrl, { redirect: 'follow' })
+      const res = await bilibiliFetch(safeShortUrl, { redirect: 'follow' })
       const targetUrl = res.url
       try {
         await res.body?.cancel()
       } catch {
         /* ignore */
       }
-      if (targetUrl && targetUrl !== shortUrl) {
+      if (targetUrl && targetUrl !== safeShortUrl) {
         return parseBilibiliInput(targetUrl)
       }
     } catch {
@@ -156,9 +160,13 @@ bilibiliDanmakuRoutes.get('/bilibili', async (c) => {
   let target = parseBilibiliInput(rawInput)
 
   const rawPageParam = c.req.query('p') ?? c.req.query('page')
-  const queryPage =
+  const parsedPage =
     rawPageParam !== undefined && rawPageParam.trim() !== ''
       ? Number(rawPageParam)
+      : -1
+  const queryPage =
+    Number.isInteger(parsedPage) && parsedPage >= 0 && parsedPage < 10_000
+      ? parsedPage
       : -1
   const queryEpId = Number(c.req.query('epid') || c.req.query('ep') || '0')
   const querySsId = Number(c.req.query('ssid') || c.req.query('ss') || '0')

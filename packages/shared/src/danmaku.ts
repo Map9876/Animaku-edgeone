@@ -249,6 +249,26 @@ export function parseBilibiliInput(input: string): BilibiliTarget | null {
   const s = (input || '').trim()
   if (!s) return null
 
+  // If input contains a protocol, verify that the host belongs to trusted Bilibili / Bangumi domains
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s)
+      const h = u.hostname.toLowerCase()
+      const isTrusted =
+        h === 'bilibili.com' ||
+        h.endsWith('.bilibili.com') ||
+        h === 'b23.tv' ||
+        h.endsWith('.b23.tv') ||
+        h === 'bangumi.tv' ||
+        h.endsWith('.bangumi.tv')
+      if (!isTrusted) {
+        return null
+      }
+    } catch {
+      return null
+    }
+  }
+
   // 1. Extract optional page index (?p=2, ?page=2, &p=2)
   let page: number | undefined
   const pageMatch = s.match(/[?&](?:p|page)=(\d+)/i)
@@ -324,11 +344,12 @@ export function parseBilibiliInput(input: string): BilibiliTarget | null {
   }
 
   // 6. Generic b23.tv short link (e.g. https://b23.tv/AbCdEf or b23.tv/AbCdEf)
-  const b23Match = s.match(/(?:https?:\/\/)?(?:www\.)?b23\.tv\/([A-Za-z0-9_-]+)/i)
+  const b23Match = s.match(/^(?:https?:\/\/)?(?:www\.)?b23\.tv\/([A-Za-z0-9_-]+)(?:[/?#].*)?$/i)
   if (b23Match) {
+    const code = b23Match[1]
     return {
       type: 'b23',
-      url: s.startsWith('http') ? s : `https://${s}`,
+      url: `https://b23.tv/${encodeURIComponent(code)}`,
       page,
       raw: s,
     }

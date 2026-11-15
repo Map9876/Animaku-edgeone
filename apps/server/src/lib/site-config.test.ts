@@ -123,10 +123,10 @@ test('adminSiteRoutes: /verify rejects unauthorized and accepts authorized reque
       'x-forwarded-for': '198.51.100.1',
     },
   })
-  assert.equal(res1.status, 401)
+  assert.equal(res1.status, 403)
 
-  // Authorized (if ADMIN_SECRET is configured or via loopback)
-  const secret = config.adminSecret || 'test-secret'
+  // Authorized (if ADMIN_SECRET is configured)
+  const secret = 'test-secret'
   config.adminSecret = secret
   try {
     const res2 = await adminSiteRoutes.request('/verify', {
@@ -143,7 +143,7 @@ test('adminSiteRoutes: /verify rejects unauthorized and accepts authorized reque
   }
 })
 
-test('site-config: resetAllSiteConfig clears all custom settings and favicon', () => {
+test('site-config: resetAllSiteConfig clears all custom settings and favicon', async () => {
   saveSiteConfig({
     siteName: '临时站名',
     siteTagline: '临时标语',
@@ -151,18 +151,25 @@ test('site-config: resetAllSiteConfig clears all custom settings and favicon', (
     iconUrl: 'https://example.com/test.png',
   })
 
-  const resetRes = adminSiteRoutes.request('/site/reset-all', {
-    method: 'POST',
-    headers: {
-      'X-Admin-Secret': 'loopback-allowed',
-    },
-  })
+  const secret = 'test-secret'
+  config.adminSecret = secret
+  try {
+    const resetRes = await adminSiteRoutes.request('/site/reset-all', {
+      method: 'POST',
+      headers: {
+        'X-Admin-Secret': secret,
+      },
+    })
+    assert.equal(resetRes.status, 200)
 
-  const cfg = getSiteConfig()
-  assert.equal(cfg.siteName, undefined)
-  assert.equal(cfg.siteTagline, undefined)
-  assert.equal(cfg.iconMode, 'default')
-  assert.equal(cfg.iconUrl, undefined)
+    const cfg = getSiteConfig()
+    assert.equal(cfg.siteName, undefined)
+    assert.equal(cfg.siteTagline, undefined)
+    assert.equal(cfg.iconMode, 'default')
+    assert.equal(cfg.iconUrl, undefined)
+  } finally {
+    config.adminSecret = ''
+  }
 })
 
 test('site-config: defaultSettings saving, fetching and resetting', async () => {
@@ -315,138 +322,165 @@ test('validateAnnouncementImageBuffer: correctly verifies PNG/JPEG/WebP/GIF and 
 })
 
 test('site-config: announcement save, history archiving, deletion, and public endpoint', async () => {
-  // 1. Initially disabled
-  saveSiteConfig({ announcementEnabled: false, announcement: null, announcementHistory: [] })
-  const initialCfg = getSiteConfig()
-  assert.equal(initialCfg.announcementEnabled, false)
+  const secret = 'test-secret'
+  config.adminSecret = secret
+  try {
+    // 1. Initially disabled
+    saveSiteConfig({ announcementEnabled: false, announcement: null, announcementHistory: [] })
+    const initialCfg = getSiteConfig()
+    assert.equal(initialCfg.announcementEnabled, false)
 
-  // 2. Reject enabling when all fields are empty
-  const emptyRes = await adminSiteRoutes.request('/site/announcement', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ enabled: true, title: '', content: '', imageUrl: '' }),
-  })
-  assert.equal(emptyRes.status, 400)
-  const emptyJson = (await emptyRes.json()) as { error: string }
-  assert.match(emptyJson.error, /至少需要填写一项/)
+    // 2. Reject enabling when all fields are empty
+    const emptyRes = await adminSiteRoutes.request('/site/announcement', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': secret,
+      },
+      body: JSON.stringify({ enabled: true, title: '', content: '', imageUrl: '' }),
+    })
+    assert.equal(emptyRes.status, 400)
+    const emptyJson = (await emptyRes.json()) as { error: string }
+    assert.match(emptyJson.error, /至少需要填写一项/)
 
-  // 3. Save a valid announcement with title only
-  const saveRes = await adminSiteRoutes.request('/site/announcement', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      enabled: true,
-      title: '系统维护通知',
-      content: '今晚 12 点进行线路切换',
-      imageUrl: '',
-      imageLink: 'https://example.com/notice',
-    }),
-  })
-  assert.equal(saveRes.status, 200)
-  const saveJson = (await saveRes.json()) as { ok: boolean; data: { announcement: { id: string; title: string } } }
-  assert.equal(saveJson.ok, true)
-  assert.equal(saveJson.data.announcement.title, '系统维护通知')
-  const annId = saveJson.data.announcement.id
-  assert.ok(annId)
+    // 3. Save a valid announcement with title only
+    const saveRes = await adminSiteRoutes.request('/site/announcement', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': secret,
+      },
+      body: JSON.stringify({
+        enabled: true,
+        title: '系统维护通知',
+        content: '今晚 12 点进行线路切换',
+        imageUrl: '',
+        imageLink: 'https://example.com/notice',
+      }),
+    })
+    assert.equal(saveRes.status, 200)
+    const saveJson = (await saveRes.json()) as { ok: boolean; data: { announcement: { id: string; title: string } } }
+    assert.equal(saveJson.ok, true)
+    assert.equal(saveJson.data.announcement.title, '系统维护通知')
+    const annId = saveJson.data.announcement.id
+    assert.ok(annId)
 
-  // Verify public endpoint returns the announcement
-  const publicRes = await siteRoutes.request('/config')
-  assert.equal(publicRes.status, 200)
-  const publicJson = (await publicRes.json()) as {
-    ok: boolean
-    announcementEnabled: boolean
-    announcement: { id: string; title: string }
+    // Verify public endpoint returns the announcement
+    const publicRes = await siteRoutes.request('/config')
+    assert.equal(publicRes.status, 200)
+    const publicJson = (await publicRes.json()) as {
+      ok: boolean
+      announcementEnabled: boolean
+      announcement: { id: string; title: string }
+    }
+    assert.equal(publicJson.announcementEnabled, true)
+    assert.equal(publicJson.announcement.id, annId)
+    assert.equal(publicJson.announcement.title, '系统维护通知')
+
+    // Verify history contains this announcement
+    const histRes = await adminSiteRoutes.request('/site/announcement-history', {
+      headers: { 'X-Admin-Secret': secret },
+    })
+    const histJson = (await histRes.json()) as { ok: boolean; data: Array<{ id: string; title: string }> }
+    assert.equal(histJson.ok, true)
+    assert.ok(histJson.data.some((h) => h.id === annId))
+
+    // Delete this announcement from history
+    const delRes = await adminSiteRoutes.request(`/site/announcement-history/${annId}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Secret': secret },
+    })
+    assert.equal(delRes.status, 200)
+    const delJson = (await delRes.json()) as { ok: boolean; data: Array<{ id: string }> }
+    assert.ok(!delJson.data.some((h) => h.id === annId))
+
+    // Clean up
+    resetAllSiteConfig()
+  } finally {
+    config.adminSecret = ''
   }
-  assert.equal(publicJson.announcementEnabled, true)
-  assert.equal(publicJson.announcement.id, annId)
-  assert.equal(publicJson.announcement.title, '系统维护通知')
-
-  // Verify history contains this announcement
-  const histRes = await adminSiteRoutes.request('/site/announcement-history')
-  const histJson = (await histRes.json()) as { ok: boolean; data: Array<{ id: string; title: string }> }
-  assert.equal(histJson.ok, true)
-  assert.ok(histJson.data.some((h) => h.id === annId))
-
-  // Delete this announcement from history
-  const delRes = await adminSiteRoutes.request(`/site/announcement-history/${annId}`, {
-    method: 'DELETE',
-  })
-  assert.equal(delRes.status, 200)
-  const delJson = (await delRes.json()) as { ok: boolean; data: Array<{ id: string }> }
-  assert.ok(!delJson.data.some((h) => h.id === annId))
-
-  // Clean up
-  resetAllSiteConfig()
 })
 
 test('site-config: customNavLinks saving, sanitizing, fetching and public exposure', async () => {
   const originalCfg = { ...getSiteConfig() }
+  const secret = 'test-secret'
+  config.adminSecret = secret
+  try {
+    // 1. Post custom nav links with one safe link and one link without protocol (auto filtered)
+    const postRes = await adminSiteRoutes.request('/site/nav-links', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': secret,
+      },
+      body: JSON.stringify({
+        links: [
+          {
+            id: 'nav_sponsor_1',
+            title: '手办周边商城',
+            url: 'https://shop.example.com',
+            badge: 'HOT',
+            target: '_blank',
+            highlight: true,
+            enabled: true,
+            order: 1,
+          },
+          {
+            id: 'nav_sponsor_disabled',
+            title: '已下架赞助商',
+            url: 'https://disabled.example.com',
+            badge: 'AD',
+            target: '_blank',
+            enabled: false,
+            order: 2,
+          },
+          {
+            id: 'nav_bad_xss',
+            title: '恶意脚本链接',
+            url: 'javascript:alert(1)',
+            enabled: true,
+          },
+        ],
+      }),
+    })
+    assert.equal(postRes.status, 200)
+    const postJson = (await postRes.json()) as { ok: boolean; data: Array<{ id: string; url: string; enabled: boolean }> }
+    assert.equal(postJson.ok, true)
+    // javascript: link should be sanitized and filtered out
+    assert.equal(postJson.data.length, 2)
+    assert.equal(postJson.data[0].id, 'nav_sponsor_1')
+    assert.equal(postJson.data[1].id, 'nav_sponsor_disabled')
 
-  // 1. Post custom nav links with one safe link and one link without protocol (auto filtered)
-  const postRes = await adminSiteRoutes.request('/site/nav-links', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      links: [
-        {
-          id: 'nav_sponsor_1',
-          title: '手办周边商城',
-          url: 'https://shop.example.com',
-          badge: 'HOT',
-          target: '_blank',
-          highlight: true,
-          enabled: true,
-          order: 1,
-        },
-        {
-          id: 'nav_sponsor_disabled',
-          title: '已下架赞助商',
-          url: 'https://disabled.example.com',
-          badge: 'AD',
-          target: '_blank',
-          enabled: false,
-          order: 2,
-        },
-        {
-          id: 'nav_bad_xss',
-          title: '恶意脚本链接',
-          url: 'javascript:alert(1)',
-          enabled: true,
-        },
-      ],
-    }),
-  })
-  assert.equal(postRes.status, 200)
-  const postJson = (await postRes.json()) as { ok: boolean; data: Array<{ id: string; url: string; enabled: boolean }> }
-  assert.equal(postJson.ok, true)
-  // javascript: link should be sanitized and filtered out
-  assert.equal(postJson.data.length, 2)
-  assert.equal(postJson.data[0].id, 'nav_sponsor_1')
-  assert.equal(postJson.data[1].id, 'nav_sponsor_disabled')
+    // 2. Admin endpoint returns both enabled and disabled links
+    const adminGetRes = await adminSiteRoutes.request('/site/nav-links', {
+      headers: { 'X-Admin-Secret': secret },
+    })
+    assert.equal(adminGetRes.status, 200)
+    const adminGetJson = (await adminGetRes.json()) as { ok: boolean; data: Array<{ id: string }> }
+    assert.equal(adminGetJson.data.length, 2)
 
-  // 2. Admin endpoint returns both enabled and disabled links
-  const adminGetRes = await adminSiteRoutes.request('/site/nav-links')
-  assert.equal(adminGetRes.status, 200)
-  const adminGetJson = (await adminGetRes.json()) as { ok: boolean; data: Array<{ id: string }> }
-  assert.equal(adminGetJson.data.length, 2)
+    // 3. Public endpoint /config returns only enabled customNavLinks
+    const pubRes = await siteRoutes.request('/config')
+    assert.equal(pubRes.status, 200)
+    const pubJson = (await pubRes.json()) as { ok: boolean; customNavLinks: Array<{ id: string }> }
+    assert.equal(pubJson.ok, true)
+    assert.equal(pubJson.customNavLinks.length, 1)
+    assert.equal(pubJson.customNavLinks[0].id, 'nav_sponsor_1')
 
-  // 3. Public endpoint /config returns only enabled customNavLinks
-  const pubRes = await siteRoutes.request('/config')
-  assert.equal(pubRes.status, 200)
-  const pubJson = (await pubRes.json()) as { ok: boolean; customNavLinks: Array<{ id: string }> }
-  assert.equal(pubJson.ok, true)
-  assert.equal(pubJson.customNavLinks.length, 1)
-  assert.equal(pubJson.customNavLinks[0].id, 'nav_sponsor_1')
+    // 4. Admin daily stats endpoint /stats/daily
+    const statsRes = await adminSiteRoutes.request('/stats/daily?date=2026-11-02', {
+      headers: { 'X-Admin-Secret': secret },
+    })
+    assert.equal(statsRes.status, 200)
+    const statsJson = (await statsRes.json()) as { ok: boolean; date: string; trend: unknown[] }
+    assert.equal(statsJson.ok, true)
+    assert.equal(statsJson.date, '2026-11-02')
+    assert.ok(Array.isArray(statsJson.trend))
 
-  // 4. Admin daily stats endpoint /stats/daily
-  const statsRes = await adminSiteRoutes.request('/stats/daily?date=2026-11-02')
-  assert.equal(statsRes.status, 200)
-  const statsJson = (await statsRes.json()) as { ok: boolean; date: string; trend: unknown[] }
-  assert.equal(statsJson.ok, true)
-  assert.equal(statsJson.date, '2026-11-02')
-  assert.ok(Array.isArray(statsJson.trend))
-
-  saveSiteConfig(originalCfg)
+    saveSiteConfig(originalCfg)
+  } finally {
+    config.adminSecret = ''
+  }
 })
 
 

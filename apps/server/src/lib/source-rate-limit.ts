@@ -1,4 +1,4 @@
-export type SourceOpKind = 'search' | 'chapters' | 'resolve'
+export type SourceOpKind = 'search' | 'chapters' | 'resolve' | 'danmaku'
 
 export interface SourceRateLimitResult {
   allowed: boolean
@@ -46,6 +46,7 @@ export function getSourceRateLimits(): Record<SourceOpKind, number> {
     search: envInt(process.env.SOURCE_SEARCH_LIMIT_PER_MIN, 15),
     chapters: envInt(process.env.SOURCE_CHAPTERS_LIMIT_PER_MIN, 15),
     resolve: envInt(process.env.SOURCE_RESOLVE_LIMIT_PER_MIN, 30),
+    danmaku: envInt(process.env.SOURCE_DANMAKU_LIMIT_PER_MIN, 60),
   }
 }
 
