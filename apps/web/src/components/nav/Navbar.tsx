@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import clsx from 'clsx'
 import { NavBrand } from './NavBrand'
 import { NavLinks } from './NavLinks'
+import { NavOnlineBadge } from './NavOnlineBadge'
 import { NavSearch } from './NavSearch'
 import { NavActions } from './NavActions'
 import { NavMobileSearch } from './NavMobileSearch'
@@ -57,6 +58,7 @@ export function Navbar() {
 
         {/* Right side: Search + Actions */}
         <div className="flex h-full items-center gap-2 sm:gap-3">
+          <NavOnlineBadge />
           <NavSearch />
           <NavActions
             mobileSearchOpen={mobileSearchOpen}
