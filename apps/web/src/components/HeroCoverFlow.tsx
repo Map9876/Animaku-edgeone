@@ -681,7 +681,7 @@ export const HeroCoverFlow = memo(function HeroCoverFlow({
       {/* 1. Dynamic Ambient Background Glow with smooth mask dissipation */}
       {ambientCoverUrl && !bgImgError && (
         <div
-          className="pointer-events-none absolute inset-0 -z-10 overflow-hidden transition-all duration-700 ease-out"
+          className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
           style={{
             maskImage:
               'linear-gradient(to bottom, transparent 0%, black 22%, black 78%, transparent 100%)',
@@ -696,7 +696,7 @@ export const HeroCoverFlow = memo(function HeroCoverFlow({
             loading="lazy"
             decoding="async"
             onError={() => setBgImgError(true)}
-            className="h-full w-full scale-135 object-cover opacity-20 blur-3xl filter transition-opacity duration-1000 dark:opacity-30"
+            className="h-full w-full scale-135 object-cover opacity-20 blur-xl filter transform-gpu transition-opacity duration-1000 dark:opacity-30"
           />
           {/* Gentle edge dissipation */}
           <div className="absolute inset-0 bg-gradient-to-b from-[var(--kz-bg)] via-transparent to-[var(--kz-bg)]" />
@@ -800,7 +800,7 @@ export const HeroCoverFlow = memo(function HeroCoverFlow({
                   {/* 右上角胶囊角标 */}
                   {adData.badge && (
                     <div className="absolute right-3 top-3 sm:right-4 sm:top-4 z-10">
-                      <span className="inline-flex items-center rounded-md border border-white/20 bg-black/60 px-2 py-0.5 text-xs font-bold text-white shadow-xs backdrop-blur-xs">
+                      <span className="inline-flex items-center rounded-md border border-white/20 bg-black/60 px-2 py-0.5 text-xs font-bold text-white shadow-xs">
                         {adData.badge}
                       </span>
                     </div>
@@ -808,7 +808,7 @@ export const HeroCoverFlow = memo(function HeroCoverFlow({
 
                   {/* 底部左侧标题 */}
                   <div className="absolute inset-x-0 bottom-0 p-3 sm:p-4 z-10 pr-16">
-                    <p className="truncate text-sm sm:text-base font-black text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                    <p className="truncate text-sm sm:text-base font-black text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.9)]">
                       {adData.title}
                     </p>
                   </div>
@@ -844,7 +844,7 @@ export const HeroCoverFlow = memo(function HeroCoverFlow({
                     preloadRoute('subject')
                     preloadVideoPlayer()
                   }}
-                  className="group relative h-full w-full select-none overflow-hidden rounded-[inherit] [isolation:isolate] [transform:translateZ(0)] [mask-image:radial-gradient(white,black)] [-webkit-mask-image:-webkit-radial-gradient(white,black)]"
+                  className="group relative h-full w-full select-none overflow-hidden rounded-[inherit] [isolation:isolate] [transform:translateZ(0)] [clip-path:inset(0_round_1.5rem)]"
                 >
                   <HeroCardPoster
                     cover={cover}
@@ -862,7 +862,7 @@ export const HeroCoverFlow = memo(function HeroCoverFlow({
                   {/* Score (Bottom-right) */}
                   {score && (
                     <div className="absolute right-3 bottom-2.5 sm:right-4 sm:bottom-3.5">
-                      <span className="font-black italic text-lg tracking-tight text-white tabular-nums drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] sm:text-2xl md:text-3xl">
+                      <span className="font-black italic text-lg tracking-tight text-white tabular-nums [text-shadow:0_2px_4px_rgba(0,0,0,0.9)] sm:text-2xl md:text-3xl">
                         {score}
                       </span>
                     </div>

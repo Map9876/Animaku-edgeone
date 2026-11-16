@@ -3,38 +3,38 @@ import { AnimatePresence, motion } from 'framer-motion'
 
 /**
  * 桌面端右下角看板娘（点击回到顶部）
- * - 仅在桌面宽屏（>=1280px / xl）展示，缩小状态与移动端自动隐藏，绝不遮挡主内容
- * - 页面向下滚动超过 200px 后，采用原版 Q 弹果冻弹簧动效从右侧滑入探出
- * - 加锁时机优化：
- *   1. 滚动进行中（如拖拽滚动条、滚轮疾滚）保持 pointer-events-none 穿透，绝不打扰用户滚动
- *   2. 动画到达末梢后增加 180ms 落定缓冲，给回弹留出自然做完的充足时间，绝不打断回弹
- *   3. 动画与悬停解耦，只有当彻底停稳且鼠标主动移入时才探头，彻底消除回弹末端的跳动
+ * - 仅在桌面宽屏（>=1280px / xl）展示，全屏与移动端自动隐藏
+ * - 页面向下滚动超过 240px 后，采用 Q 弹 Spring 动效探出
+ * - 回到顶部退场时采用平滑缓动（0.45s）优雅缩回，清晰展现收回动画
+ * - 交互 Hitbox 与动效层彻底解耦，杜绝边缘悬停时的死循环抽搐（动画打架）
+ * - 避让右侧原生滚动条，确保拖拽滚动条时不误触，点击 100% 灵敏回到顶部
  */
 export function BackToTopMascot() {
   const [isVisible, setIsVisible] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isScrolling, setIsScrolling] = useState(false)
-  const [isSettled, setIsSettled] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
 
   const scrollTimerRef = useRef<number | null>(null)
-  const settleTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsVisible(window.scrollY > 200)
+      const currentY = window.scrollY
+      // 迟滞防抖：向下超过 240px 探出，回滚到顶部 50px 以内平稳收回
+      setIsVisible((prev) => {
+        if (currentY > 240) return true
+        if (currentY < 50) return false
+        return prev
+      })
       setIsScrolling(true)
-
-      // 滚动期间保持静音，防止拖动滚动条时被误触发
-      setIsHovered(false)
 
       if (scrollTimerRef.current) {
         window.clearTimeout(scrollTimerRef.current)
       }
-      // 停止滚动 180ms 后，才视作滚动动作彻底结束
+      // 滚动停止 100ms 后恢复交互
       scrollTimerRef.current = window.setTimeout(() => {
         setIsScrolling(false)
-      }, 180)
+      }, 100)
     }
 
     const handleFullscreenChange = () => {
@@ -51,20 +51,8 @@ export function BackToTopMascot() {
       window.removeEventListener('scroll', handleScroll)
       document.removeEventListener('fullscreenchange', handleFullscreenChange)
       if (scrollTimerRef.current) window.clearTimeout(scrollTimerRef.current)
-      if (settleTimerRef.current) window.clearTimeout(settleTimerRef.current)
     }
   }, [])
-
-  // 当离开展示区域开始退场时，立刻上锁
-  useEffect(() => {
-    if (!isVisible) {
-      setIsSettled(false)
-      setIsHovered(false)
-      if (settleTimerRef.current) {
-        window.clearTimeout(settleTimerRef.current)
-      }
-    }
-  }, [isVisible])
 
   const scrollToTop = () => {
     window.scrollTo({
@@ -72,9 +60,6 @@ export function BackToTopMascot() {
       behavior: 'smooth',
     })
   }
-
-  // 必须是：动画彻底停稳 + 页面当前未处于滚动状态
-  const canInteract = isSettled && !isScrolling
 
   // 全屏模式下完全隐藏，避免影响看番
   if (isFullscreen) return null
@@ -84,68 +69,57 @@ export function BackToTopMascot() {
       {isVisible && (
         <motion.div
           initial={{ x: '100%', opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: '100%', opacity: 0 }}
-          // 原汁原味、完全不变的 Q 弹 Spring 动画参数
-          transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-          // 动画状态锁：给弹簧末梢的回弹留足自然完成时间（180ms），彻底静止后才解锁
-          onAnimationComplete={() => {
-            if (isVisible) {
-              if (settleTimerRef.current) window.clearTimeout(settleTimerRef.current)
-              settleTimerRef.current = window.setTimeout(() => {
-                setIsSettled(true)
-              }, 180)
+          animate={{
+            x: 0,
+            opacity: 1,
+            transition: { type: 'spring', stiffness: 260, damping: 22 },
+          }}
+          exit={{
+            x: '100%',
+            opacity: 0,
+            transition: { duration: 0.45, ease: [0.32, 0.72, 0, 1] },
+          }}
+          className={`fixed right-3 bottom-8 z-40 hidden select-none xl:block focus:outline-none transform-gpu isolate ${
+            isScrolling ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'
+          }`}
+          onClick={scrollToTop}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          onFocus={() => setIsHovered(true)}
+          onBlur={() => setIsHovered(false)}
+          aria-label="回到顶部"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              scrollToTop()
             }
           }}
-          className={`fixed right-0 bottom-8 z-40 hidden select-none xl:block focus:outline-none ${
-            canInteract ? 'cursor-pointer pointer-events-auto' : 'pointer-events-none'
-          }`}
         >
-          {/* 内层容器：通过真实 active hover 状态驱动，避免原地死光标在解锁瞬间导致跳动 */}
+          {/* 纯视觉层：鼠标事件绑定在外层固定 Hitbox 上，内部位移不影响鼠标命中，彻底消除悬停震荡 */}
           <motion.div
             animate={{
-              x: canInteract && isHovered ? -10 : 0,
+              x: isHovered ? -8 : 0,
             }}
-            whileTap={canInteract ? { scale: 0.92, y: 3 } : undefined}
+            whileTap={{ scale: 0.94, y: 2 }}
             transition={{
               type: 'spring',
-              stiffness: 380,
+              stiffness: 340,
               damping: 24,
             }}
-            onClick={canInteract ? scrollToTop : undefined}
-            onMouseEnter={() => {
-              if (canInteract) setIsHovered(true)
-            }}
-            onMouseLeave={() => {
-              setIsHovered(false)
-            }}
-            onFocus={() => {
-              if (canInteract) setIsHovered(true)
-            }}
-            onBlur={() => {
-              setIsHovered(false)
-            }}
-            aria-label="回到顶部"
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (canInteract && (e.key === 'Enter' || e.key === ' ')) {
-                e.preventDefault()
-                scrollToTop()
-              }
-            }}
-            className="focus:outline-none"
+            className="pointer-events-none"
           >
             <div className="relative">
-              {/* 1. 受惊闪电符号：平时隐藏，鼠标 Hover / Focus 聚焦时弹簧弹性弹出 + 轻颤动效 */}
+              {/* 1. 受惊闪电符号：平时隐藏，鼠标 Hover 时弹跳探出 */}
               <motion.div
                 initial={false}
                 animate={
-                  canInteract && isHovered
+                  isHovered
                     ? {
                         opacity: 1,
-                        scale: [0, 1.25, 0.92, 1],
-                        rotate: [-14, 3, -1, 0],
+                        scale: 1,
+                        rotate: 0,
                       }
                     : {
                         opacity: 0,
@@ -154,8 +128,9 @@ export function BackToTopMascot() {
                       }
                 }
                 transition={{
-                  duration: 0.28,
-                  ease: 'easeOut',
+                  type: 'spring',
+                  stiffness: 380,
+                  damping: 20,
                 }}
                 style={{
                   position: 'absolute',
@@ -173,19 +148,21 @@ export function BackToTopMascot() {
                     alt=""
                     aria-hidden
                     draggable={false}
+                    decoding="async"
                     className="h-auto w-full drop-shadow-[0_2px_8px_rgba(0,0,0,0.18)]"
                   />
                 </picture>
               </motion.div>
 
-              {/* 2. 看板娘身体本体：平时安静探头 */}
+              {/* 2. 看板娘身体本体 */}
               <picture>
                 <source srcSet="/assets/mascot-body.webp" type="image/webp" />
                 <img
                   src="/assets/mascot-body.png"
                   alt="回到顶部"
                   draggable={false}
-                  className="h-auto w-[115px] 2xl:w-[130px] drop-shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-all duration-200 hover:drop-shadow-[0_6px_20px_rgba(0,0,0,0.2)]"
+                  decoding="async"
+                  className="h-auto w-[115px] 2xl:w-[130px] transform-gpu drop-shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
                 />
               </picture>
             </div>

@@ -44,8 +44,8 @@ export function Navbar() {
         'relative z-40 transition-[background-color,border-color] duration-300 ease-out shadow-none',
         isWatch ? 'relative lg:sticky lg:top-0' : 'sticky top-0',
         scrolled
-          ? 'border-b border-[var(--kz-border)]/80 bg-[var(--kz-header-bg)]/95 backdrop-blur-2xl'
-          : 'border-b border-transparent bg-transparent backdrop-blur-none',
+          ? 'border-b border-[var(--kz-border)]/80 bg-[var(--kz-header-bg)]/95'
+          : 'border-b border-transparent bg-transparent',
       )}
     >
       {/* Main unified navbar container: h-14 (56px) on mobile, h-16 (64px) on desktop */}

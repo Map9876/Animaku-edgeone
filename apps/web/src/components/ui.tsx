@@ -175,7 +175,7 @@ export const BangumiCard = memo(function BangumiCard({
         {/* top-right status: unboxed upright bold text directly on cover */}
         {airLabel && (
           <span
-            className={`absolute top-2 right-2.5 text-xs font-bold tracking-wider drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] sm:text-[13px] ${airStatusClass(air.status)}`}
+            className={`absolute top-2 right-2.5 text-xs font-bold tracking-wider [text-shadow:0_1px_3px_rgba(0,0,0,0.9)] sm:text-[13px] ${airStatusClass(air.status)}`}
           >
             {airLabel}
           </span>
@@ -195,7 +195,7 @@ export const BangumiCard = memo(function BangumiCard({
           </span>
         )}
         {score && (
-          <span className="absolute bottom-1 right-2.5 text-lg font-black italic tracking-tight text-white tabular-nums drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)] sm:text-xl">
+          <span className="absolute bottom-1 right-2.5 text-lg font-black italic tracking-tight text-white tabular-nums [text-shadow:0_2px_4px_rgba(0,0,0,0.85)] sm:text-xl">
             {score}
           </span>
         )}
@@ -370,7 +370,7 @@ export const BangumiGrid = memo(function BangumiGrid({
               delay: staggerDelay,
               ease: 'easeOut',
             }}
-            className="min-w-0 will-change-[transform,opacity]"
+            className="min-w-0"
           >
             <BangumiCard
               item={item}
