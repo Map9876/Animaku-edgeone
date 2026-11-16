@@ -1,6 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import type { Context } from 'hono'
 import type { BangumiItem } from '@animaku/shared'
 import { config } from '../config'
@@ -10,6 +8,7 @@ import { fetchSitemapSubjects, SITEMAP_STATIC_PATHS } from './seo-static'
 const INDEXNOW_API = 'https://api.indexnow.org/IndexNow'
 const INDEXNOW_TIMEOUT_MS = 10_000 // 10s timeout
 const INDEXNOW_MAX_BATCH_SIZE = 10_000
+const DEFAULT_INDEXNOW_KEY = '4ddfeb9c68384dd99bc302fb0f02eaf1'
 
 export interface IndexNowBatchResult {
   batch: number
@@ -31,50 +30,21 @@ export interface IndexNowSubmitSummary {
   message: string
 }
 
-let cachedIndexNowKey = ''
-
 /**
- * Get or automatically generate and persist the IndexNow key.
- * 1. Honors process.env.INDEXNOW_KEY if explicitly provided.
- * 2. Checks data/indexnow.key for an existing persisted unique key.
- * 3. Otherwise generates a unique 32-character hex key and saves it to data/indexnow.key.
+ * Validates and retrieves the active IndexNow key.
+ * 1. Checks format: 8-128 alphanumeric characters and hyphens.
+ * 2. Falls back safely to default built-in key if invalid or unset.
  */
 export function getIndexNowKey(): string {
-  if (cachedIndexNowKey) return cachedIndexNowKey
+  const raw = (config.indexnowKey || process.env.INDEXNOW_KEY || '').trim()
+  if (!raw) return DEFAULT_INDEXNOW_KEY
 
-  const envKey = (config.indexnowKey || process.env.INDEXNOW_KEY || '').trim()
-  if (envKey) {
-    cachedIndexNowKey = envKey
-    return cachedIndexNowKey
+  if (/^[a-zA-Z0-9-]{8,128}$/.test(raw)) {
+    return raw
   }
 
-  const keyPath = resolve(config.dataDir, 'indexnow.key')
-  try {
-    if (existsSync(keyPath)) {
-      const persisted = readFileSync(keyPath, 'utf-8').trim()
-      if (persisted && /^[a-zA-Z0-9-]{8,128}$/.test(persisted)) {
-        cachedIndexNowKey = persisted
-        return cachedIndexNowKey
-      }
-    }
-  } catch {
-    /* ignore read error */
-  }
-
-  // Generate unique 32-hex character key
-  const generated = randomBytes(16).toString('hex')
-  try {
-    if (!existsSync(config.dataDir)) {
-      mkdirSync(config.dataDir, { recursive: true })
-    }
-    writeFileSync(keyPath, generated, 'utf-8')
-    console.log(`[indexnow] 自动为当前站点生成独一无二的 IndexNow 密钥: ${generated}`)
-  } catch (err) {
-    console.warn('[indexnow] 持久化 indexnow.key 失败，使用当前内存密钥:', err)
-  }
-
-  cachedIndexNowKey = generated
-  return cachedIndexNowKey
+  console.warn(`[indexnow] INDEXNOW_KEY '${raw}' 格式不合法（必须为 8~128 位十六进制或字母数字字符），回退到默认密钥`)
+  return DEFAULT_INDEXNOW_KEY
 }
 
 /**
