@@ -214,7 +214,7 @@ export function HomeLeaderboards() {
       {/* 左右双栏结构 (桌面端 2 大卡片并排，移动端上下折叠) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* 左模块：观看排行榜 */}
-        <div className="kz-surface flex flex-col justify-between overflow-hidden rounded-2xl border border-[var(--kz-border)]/60 p-4 shadow-xs">
+        <div className="kz-surface flex flex-col overflow-hidden rounded-2xl border border-[var(--kz-border)]/60 p-4 shadow-xs">
           {/* 1. 小标题与卡片头部 */}
           <div className="mb-3.5 flex items-center justify-between gap-2">
             <span className="text-[14px] font-bold text-[var(--kz-fg)]">
@@ -263,14 +263,14 @@ export function HomeLeaderboards() {
               ))}
             </div>
           ) : (
-            <div className="flex aspect-[3/1.6] w-full items-center justify-center text-xs text-[var(--kz-fg-muted)]">
+            <div className="flex flex-1 items-center justify-center py-8 text-xs text-[var(--kz-fg-muted)]">
               暂无排行数据
             </div>
           )}
         </div>
 
         {/* 右模块：观看总榜 */}
-        <div className="kz-surface flex flex-col justify-between overflow-hidden rounded-2xl border border-[var(--kz-border)]/60 p-4 shadow-xs">
+        <div className="kz-surface flex flex-col overflow-hidden rounded-2xl border border-[var(--kz-border)]/60 p-4 shadow-xs">
           {/* 卡片头部：左侧标题，右侧樱花粉在线用户胶囊 */}
           <div className="mb-3.5 flex items-center justify-between gap-2">
             <span className="text-[14px] font-bold text-[var(--kz-fg)]">
@@ -307,7 +307,7 @@ export function HomeLeaderboards() {
               ))}
             </div>
           ) : (
-            <div className="flex aspect-[3/1.6] w-full items-center justify-center text-xs text-[var(--kz-fg-muted)]">
+            <div className="flex flex-1 items-center justify-center py-8 text-xs text-[var(--kz-fg-muted)]">
               暂无排行数据
             </div>
           )}
