@@ -25,9 +25,9 @@ on:
         default: false
         type: boolean
 
-  # 2. 定时巡检 (每天北京时间 08:00 / UTC 00:00 自动探活)
-  schedule:
-    - cron: '0 0 * * *'
+  # 2. 定时巡检 (已暂时停用)
+  # schedule:
+  #   - cron: '0 0 * * *'
 
 jobs:
   health-check:
