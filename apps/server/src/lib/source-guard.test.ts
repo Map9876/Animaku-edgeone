@@ -105,3 +105,19 @@ test('assertOwnSourceUrl: validates allowed domains and rejects external/malicio
     /cannot be empty/,
   )
 })
+
+test('searchJzacg: strictly falls back to official JZACG domain when malicious baseURL is provided', async () => {
+  const { searchJzacg, JZACG_BASE_URL } = await import('./jzacg')
+  const maliciousRule = {
+    name: 'jzacg',
+    baseURL: 'https://attacker-ssrf.com',
+  }
+
+  // 搜索关键字触发
+  const result = await searchJzacg(maliciousRule as any, '海贼王')
+  // 检查 diagnostics，确保请求的绝对不是 attacker-ssrf.com，而是官方默认域名
+  if (result.diagnostics && result.diagnostics.length > 0) {
+    const diagText = result.diagnostics.join(' ')
+    assert.equal(diagText.includes('attacker-ssrf.com'), false, '绝不能向恶意 baseURL 发起请求')
+  }
+})

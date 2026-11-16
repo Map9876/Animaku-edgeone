@@ -22,6 +22,7 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
+import { readTextLimited } from './http'
 import { assertOwnSourceUrl, resolveSafeBaseUrl } from './source-guard'
 
 export const JZACG_BASE_URL = 'https://www.jzacg.com'
@@ -109,7 +110,11 @@ export async function searchJzacg(
     return { pluginName: rule.name, items: [] }
   }
 
-  const effectiveBase = (rule.baseURL || JZACG_BASE_URL).replace(/\/+$/, '')
+  const effectiveBase = resolveSafeBaseUrl(
+    rule.baseURL,
+    JZACG_BASE_URL,
+    JZACG_ALLOWED_HOSTS,
+  )
   const diagnostics: string[] = []
   const items: SearchItem[] = []
   const seenUrls = new Set<string>()
@@ -122,7 +127,7 @@ export async function searchJzacg(
     })
 
     if (res.ok) {
-      const html = await res.text()
+      const html = await readTextLimited(res)
       const $ = cheerio.load(html)
       $('a[href*="/media/"]').each((_, a) => {
         const href = $(a).attr('href') || ''
@@ -204,7 +209,7 @@ export async function chaptersJzacg(
     throw new Error(`橘子动漫获取番剧详情失败 (HTTP ${res.status})`)
   }
 
-  const html = await res.text()
+  const html = await readTextLimited(res)
   const $ = cheerio.load(html)
   const roads: Road[] = []
 
@@ -424,7 +429,7 @@ export async function resolveJzacg(
     throw new Error(`橘子动漫播放页请求失败 (HTTP ${res.status})`)
   }
 
-  const html = await res.text()
+  const html = await readTextLimited(res)
 
   // 1. 优先提取 player_aaaa 并走官方线路解析
   const player = extractPlayerAaaa(html)
@@ -445,7 +450,7 @@ export async function resolveJzacg(
       })
 
       if (iRes.ok) {
-        const iHtml = await iRes.text()
+        const iHtml = await readTextLimited(iRes)
 
         const charsetMatch =
           iHtml.match(/<meta[^>]*charset=["']?UTF-8["']?[^>]*id=["']now_(\d+)["']/i) ||

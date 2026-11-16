@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { getClientIp } from './logger'
+import { resolveIp } from './ip-rate-limit'
 import {
   checkSourceRateLimit,
   SourceRateLimitError,
@@ -53,7 +53,7 @@ export async function fetchDanmakuWithGuard<T>(
 ): Promise<GuardedDanmakuResult<T>> {
   const { c, upstreamKey, cacheKey, ttlMs, keyPrefix, loader } = options
   const wantsBypass = wantsCacheBypass(c)
-  const clientIp = getClientIp(c.req)
+  const clientIp = resolveIp(c)
 
   // 1. 尝试读现有缓存
   const cached = cacheGet<T>(cacheKey)
