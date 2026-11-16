@@ -1,4 +1,6 @@
-import { createHash, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { Context } from 'hono'
 import type { BangumiItem } from '@animaku/shared'
 import { config } from '../config'
@@ -21,11 +23,58 @@ export interface IndexNowSubmitSummary {
   ok: boolean
   host: string
   totalSubmitted: number
+  submitted: number
   validCount: number
   rejectedCount: number
   rejectedUrls?: string[]
   results: IndexNowBatchResult[]
   message: string
+}
+
+let cachedIndexNowKey = ''
+
+/**
+ * Get or automatically generate and persist the IndexNow key.
+ * 1. Honors process.env.INDEXNOW_KEY if explicitly provided.
+ * 2. Checks data/indexnow.key for an existing persisted unique key.
+ * 3. Otherwise generates a unique 32-character hex key and saves it to data/indexnow.key.
+ */
+export function getIndexNowKey(): string {
+  if (cachedIndexNowKey) return cachedIndexNowKey
+
+  const envKey = (config.indexnowKey || process.env.INDEXNOW_KEY || '').trim()
+  if (envKey) {
+    cachedIndexNowKey = envKey
+    return cachedIndexNowKey
+  }
+
+  const keyPath = resolve(config.dataDir, 'indexnow.key')
+  try {
+    if (existsSync(keyPath)) {
+      const persisted = readFileSync(keyPath, 'utf-8').trim()
+      if (persisted && /^[a-zA-Z0-9-]{8,128}$/.test(persisted)) {
+        cachedIndexNowKey = persisted
+        return cachedIndexNowKey
+      }
+    }
+  } catch {
+    /* ignore read error */
+  }
+
+  // Generate unique 32-hex character key
+  const generated = randomBytes(16).toString('hex')
+  try {
+    if (!existsSync(config.dataDir)) {
+      mkdirSync(config.dataDir, { recursive: true })
+    }
+    writeFileSync(keyPath, generated, 'utf-8')
+    console.log(`[indexnow] 自动为当前站点生成独一无二的 IndexNow 密钥: ${generated}`)
+  } catch (err) {
+    console.warn('[indexnow] 持久化 indexnow.key 失败，使用当前内存密钥:', err)
+  }
+
+  cachedIndexNowKey = generated
+  return cachedIndexNowKey
 }
 
 /**
@@ -148,6 +197,7 @@ export async function submitToIndexNow(
       ok: false,
       host: '',
       totalSubmitted: 0,
+      submitted: 0,
       validCount: 0,
       rejectedCount: urls.length,
       results: [],
@@ -155,16 +205,17 @@ export async function submitToIndexNow(
     }
   }
 
-  const key = config.indexnowKey
+  const key = getIndexNowKey()
   if (!key) {
     return {
       ok: false,
       host: '',
       totalSubmitted: 0,
+      submitted: 0,
       validCount: 0,
       rejectedCount: urls.length,
       results: [],
-      message: 'IndexNow Key 未配置（INDEXNOW_KEY 为空）',
+      message: 'IndexNow Key 未配置或自动生成失败',
     }
   }
 
@@ -176,6 +227,7 @@ export async function submitToIndexNow(
       ok: false,
       host: '',
       totalSubmitted: 0,
+      submitted: 0,
       validCount: 0,
       rejectedCount: urls.length,
       results: [],
@@ -190,6 +242,7 @@ export async function submitToIndexNow(
       ok: false,
       host,
       totalSubmitted: 0,
+      submitted: 0,
       validCount: 0,
       rejectedCount: urls.length,
       results: [],
@@ -205,6 +258,7 @@ export async function submitToIndexNow(
       ok: false,
       host,
       totalSubmitted: 0,
+      submitted: 0,
       validCount: 0,
       rejectedCount: rejected.length,
       rejectedUrls: rejected.slice(0, 10),
@@ -237,6 +291,7 @@ export async function submitToIndexNow(
     ok: allOk,
     host,
     totalSubmitted,
+    submitted: totalSubmitted,
     validCount: valid.length,
     rejectedCount: rejected.length,
     rejectedUrls: rejected.length > 0 ? rejected.slice(0, 10) : undefined,

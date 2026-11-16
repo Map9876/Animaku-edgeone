@@ -39,6 +39,7 @@ import {
   isAuthorizedAdmin,
   submitFullSitemapToIndexNow,
   submitDifferentialSitemapSubjects,
+  getIndexNowKey,
 } from './lib/indexnow'
 import {
   handleSubjectPrerender,
@@ -217,6 +218,23 @@ app.get('/sitemap.xml', async (c) => {
       'Cache-Control': 'public, max-age=21600',
     },
   })
+})
+
+// IndexNow Key verification route (dynamically serves /{KEY}.txt for Bing/Yandex ownership validation)
+app.get('/:key.txt', (c, next) => {
+  const reqKey = c.req.param('key')
+  if (!reqKey || reqKey === 'robots' || reqKey === 'llms') return next()
+  const currentKey = getIndexNowKey()
+  if (currentKey && reqKey.toLowerCase() === currentKey.toLowerCase()) {
+    return new Response(currentKey, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, max-age=86400',
+      },
+    })
+  }
+  return next()
 })
 
 // Production: one process serves API + Vite build (same origin → no /api proxy needed)

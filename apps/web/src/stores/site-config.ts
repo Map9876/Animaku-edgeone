@@ -60,7 +60,7 @@ export interface SiteConfigState {
   uploadIcon: (file: File) => Promise<void>
   resetIcon: () => Promise<void>
   resetAllConfig: () => Promise<void>
-  triggerIndexNow: () => Promise<{ ok: boolean; submitted?: number; message?: string }>
+  triggerIndexNow: () => Promise<{ ok: boolean; submitted?: number; totalSubmitted?: number; message?: string }>
 
   // 广告外链管理与日活查询
   fetchAdminNavLinks: () => Promise<CustomNavLink[]>
@@ -654,6 +654,7 @@ export const useSiteConfigStore = create<SiteConfigState>((set, get) => ({
     const res = await api<{
       ok: boolean
       submitted?: number
+      totalSubmitted?: number
       message?: string
     }>('/api/admin/indexnow', {
       method: 'POST',

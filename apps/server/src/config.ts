@@ -306,11 +306,10 @@ export const config = {
   timezone,
   /**
    * IndexNow Key for search engine instant indexing (Bing, Yandex, Seznam, Naver).
-   * Key verification file is served at public/{INDEXNOW_KEY}.txt
+   * If unset, a unique 32-character hex key is automatically generated and persisted in data/indexnow.key.
+   * Key verification file is dynamically served at /{INDEXNOW_KEY}.txt
    */
-  indexnowKey: (
-    process.env.INDEXNOW_KEY || '4ddfeb9c68384dd99bc302fb0f02eaf1'
-  ).trim(),
+  indexnowKey: (process.env.INDEXNOW_KEY || '').trim(),
   /**
    * Dedicated Admin secret token for protected operations (e.g. POST /api/admin/indexnow).
    */

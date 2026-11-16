@@ -1004,7 +1004,8 @@ function AdminDashboard() {
     try {
       const res = await triggerIndexNow()
       if (res.ok) {
-        setIndexMsg(`✅ 成功向 Bing / Yandex 推送 ${res.submitted ?? 0} 条番剧链接`)
+        const count = res.submitted ?? res.totalSubmitted ?? 0
+        setIndexMsg(`✅ 成功向 Bing / Yandex 推送 ${count} 条番剧链接`)
       } else {
         setIndexMsg(`❌ 推送失败: ${res.message || '未知错误'}`)
       }
