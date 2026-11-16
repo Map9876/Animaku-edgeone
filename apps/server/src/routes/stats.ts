@@ -10,7 +10,7 @@ import type {
 import { watchStatsRepo } from '../db'
 import { getClientIp, parseClientDevice } from '../lib/logger'
 import { clientRemoteAddress } from '../lib/access'
-import { setRankingsCdnHeaders } from '../lib/cdn-cache-headers'
+import { setRankingsCdnHeaders, setOnlineUsersCdnHeaders } from '../lib/cdn-cache-headers'
 
 export const statsRoutes = new Hono()
 
@@ -170,6 +170,14 @@ async function handlePingActive(c: Context) {
 // Global active device heartbeat endpoint (CDN bypass guaranteed via POST + no-store)
 statsRoutes.post('/ping', handlePingActive)
 statsRoutes.post('/active', handlePingActive)
+
+// Instantaneous online active users count within 30-minute rolling window (1-min CDN edge cache)
+statsRoutes.get('/online', (c) => {
+  const bypass = c.req.query('refresh') === '1' || c.req.header('cache-control')?.includes('no-cache')
+  setOnlineUsersCdnHeaders(c as never, Boolean(bypass))
+  const online = watchStatsRepo.getOnlineUsersCount()
+  return c.json({ online })
+})
 
 // Single + Plural route alias support (/view & /views)
 statsRoutes.post('/view', handleRecordView)

@@ -241,12 +241,22 @@ test('WatchStatsRepository & Stats Routes Integration', async (t) => {
     const pingData = (await pingRes.json()) as any
     assert.equal(pingData.ok, true)
 
-    // 3. Test GET /rank?type=today
+    // 2.2 Test GET /online (active online users counter with 1-min CDN cache)
+    const onlineReq = new Request('http://localhost/online')
+    const onlineRes = await statsRoutes.fetch(onlineReq)
+    assert.equal(onlineRes.status, 200)
+    assert.ok(onlineRes.headers.get('Cache-Control')?.includes('s-maxage=60'))
+    assert.equal(onlineRes.headers.get('CDN-Cache-Control'), 'max-age=60')
+    const onlineData = (await onlineRes.json()) as any
+    assert.ok(typeof onlineData.online === 'number')
+    assert.ok(onlineData.online >= 2) // dev_http_001, dev_http_002, dev_ping_001
+
+    // 3. Test GET /rank?type=today (1-hour CDN cache)
     const rankReq = new Request('http://localhost/rank?type=today&limit=5')
     const rankRes = await statsRoutes.fetch(rankReq)
     assert.equal(rankRes.status, 200)
-    assert.ok(rankRes.headers.get('Cache-Control')?.includes('s-maxage=300'))
-    assert.equal(rankRes.headers.get('CDN-Cache-Control'), 'max-age=300')
+    assert.ok(rankRes.headers.get('Cache-Control')?.includes('s-maxage=3600'))
+    assert.equal(rankRes.headers.get('CDN-Cache-Control'), 'max-age=3600')
     const rankData = (await rankRes.json()) as any
     assert.equal(rankData.type, 'today')
     assert.equal(rankData.limit, 5)
@@ -275,7 +285,7 @@ test('WatchStatsRepository & Stats Routes Integration', async (t) => {
     const subReq = new Request('http://localhost/subject/90001')
     const subRes = await statsRoutes.fetch(subReq)
     assert.equal(subRes.status, 200)
-    assert.ok(subRes.headers.get('Cache-Control')?.includes('s-maxage=300'))
+    assert.ok(subRes.headers.get('Cache-Control')?.includes('s-maxage=3600'))
     const subData = (await subRes.json()) as any
     assert.equal(subData.data.bangumiId, 90001)
   })

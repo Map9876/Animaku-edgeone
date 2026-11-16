@@ -2,6 +2,7 @@ import type {
   RecordPlayViewResponse,
   AnimePlayStats,
   RecordDeviceActiveResponse,
+  OnlineUsersResponse,
 } from '@animaku/shared'
 import { useSettingsStore } from '../stores/settings'
 import { getCachedBrowserFingerprint } from './fingerprint'
@@ -118,6 +119,10 @@ export async function api<T>(
 }
 
 export const statsApi = {
+  getOnlineUsers: (opts?: { signal?: AbortSignal }) =>
+    api<OnlineUsersResponse>('/api/stats/online', {
+      signal: opts?.signal,
+    }),
   pingActive: () =>
     api<RecordDeviceActiveResponse>('/api/stats/ping', {
       method: 'POST',

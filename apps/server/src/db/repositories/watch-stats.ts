@@ -6,6 +6,12 @@ import { config } from '../../config'
 /** Deduplication window per device + anime + episode: 10 minutes */
 export const DEDUP_WINDOW_MS = 10 * 60 * 1000
 
+/** Active online users sliding window: 30 minutes */
+export const ONLINE_WINDOW_MS = 30 * 60 * 1000
+
+/** Top rankings memory cache TTL: 1 hour */
+export const RANKINGS_CACHE_TTL_MS = 60 * 60 * 1000
+
 /** Default batch flush interval: 60 seconds (1 minute) */
 const DEFAULT_FLUSH_INTERVAL_MS = 60 * 1000
 
@@ -71,6 +77,9 @@ export class WatchStatsRepository {
   /** Lightweight in-memory cache for ranking results: key -> { data, expiresAt } */
   private rankingCache = new Map<string, { data: Array<{ bangumiId: number; totalPlayCount: number }>; expiresAt: number }>()
 
+  /** Instantaneous active online users sliding window tracker: deviceId -> expireTimestamp */
+  private watchingUsers = new Map<string, number>()
+
   private flushTimer: NodeJS.Timeout | null = null
   private cleanupTimer: NodeJS.Timeout | null = null
   private isFlushing = false
@@ -98,6 +107,11 @@ export class WatchStatsRepository {
       for (const [devId, ts] of this.activeDeviceCache.entries()) {
         if (now - ts > DEDUP_WINDOW_MS) {
           this.activeDeviceCache.delete(devId)
+        }
+      }
+      for (const [devId, expireAt] of this.watchingUsers.entries()) {
+        if (now >= expireAt) {
+          this.watchingUsers.delete(devId)
         }
       }
       for (const [ip, item] of this.ipNewDeviceTracker.entries()) {
@@ -203,12 +217,15 @@ export class WatchStatsRepository {
       return { success: false, deduped: false }
     }
 
+    const now = Date.now()
+    // Refresh 30-minute online sliding window
+    this.refreshWatchingUser(cleanDeviceId, now)
+
     // 0. 未开启数据库时（DB_ENABLED=false），直接返回成功
     if (!isDatabaseActive()) {
       return { success: true, deduped: false }
     }
 
-    const now = Date.now()
     const lastActive = this.activeDeviceCache.get(cleanDeviceId)
     if (lastActive && now - lastActive < DEDUP_WINDOW_MS) {
       return { success: true, deduped: true }
@@ -268,6 +285,9 @@ export class WatchStatsRepository {
     const cleanDeviceId = deviceId.trim()
     const cleanEpisode = Math.max(0, Math.trunc(Number(episode) || 0))
     const dedupKey = `${cleanDeviceId}::${bangumiId}::${cleanEpisode}`
+
+    // Refresh 30-minute online sliding window
+    this.refreshWatchingUser(cleanDeviceId, now)
 
     // 1. Sliding window deduplication check
     const lastSeen = this.dedupCache.get(dedupKey)
@@ -484,9 +504,6 @@ export class WatchStatsRepository {
       }
 
       db.exec('COMMIT;')
-
-      // Invalidate ranking cache on flush
-      this.rankingCache.clear()
     } catch (err) {
       try {
         db.exec('ROLLBACK;')
@@ -618,10 +635,10 @@ export class WatchStatsRepository {
         }))
       }
 
-      // Cache ranking for 5 minutes
+      // Cache ranking for 1 hour (matching CDN edge TTL, eliminating cache stampede)
       this.rankingCache.set(cacheKey, {
         data: results,
-        expiresAt: now + 5 * 60 * 1000,
+        expiresAt: now + RANKINGS_CACHE_TTL_MS,
       })
 
       return results
@@ -629,6 +646,29 @@ export class WatchStatsRepository {
       console.error('[db:watch-stats] getTopRankings error:', err)
       return []
     }
+  }
+
+  /**
+   * Slide the active online window for the given device ID by 30 minutes.
+   */
+  refreshWatchingUser(deviceId: string, now = Date.now()): void {
+    if (!deviceId) return
+    this.watchingUsers.set(deviceId, now + ONLINE_WINDOW_MS)
+  }
+
+  /**
+   * Retrieve instantaneous count of online active users within the 30-minute rolling sliding window.
+   */
+  getOnlineUsersCount(now = Date.now()): number {
+    let count = 0
+    for (const [devId, expireAt] of this.watchingUsers.entries()) {
+      if (expireAt > now) {
+        count++
+      } else {
+        this.watchingUsers.delete(devId)
+      }
+    }
+    return count
   }
 
   /**

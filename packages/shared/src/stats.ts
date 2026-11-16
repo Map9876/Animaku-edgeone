@@ -17,6 +17,10 @@ export interface RecordDeviceActiveResponse {
   ok: boolean
 }
 
+export interface OnlineUsersResponse {
+  online: number
+}
+
 export interface RecordPlayViewResponse {
   success: boolean
   playCount: number

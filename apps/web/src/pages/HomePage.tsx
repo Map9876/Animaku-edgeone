@@ -29,6 +29,7 @@ import {
 } from '../components/SiteAnnouncementModal'
 import { SiteHighlightBanner } from '../components/SiteHighlightBanner'
 import { ViewAllLink } from '../components/ViewAllLink'
+import { HomeLeaderboards } from '../components/home/HomeLeaderboards'
 
 const TRENDING_LIMIT = 14
 const SUB_SECTION_LIMIT = 7
@@ -280,6 +281,15 @@ export function HomePage() {
           </div>
         </section>
       )}
+
+      {/* 运营展位：排行榜上方 */}
+      <SiteHighlightBanner placement="home_above_leaderboards" />
+
+      {/* 热门与经典双栏排行榜 (日/周/月 + 总榜，无数据自动隐藏) */}
+      <HomeLeaderboards />
+
+      {/* 运营展位：热门番剧上方 */}
+      <SiteHighlightBanner placement="home_above_trending" />
 
       {/* 热门番剧 */}
       <section>

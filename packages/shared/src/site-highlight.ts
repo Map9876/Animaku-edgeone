@@ -5,6 +5,8 @@ export type HighlightPlacement =
   | 'hero_banner' // 首页轮播图 (嵌入卡片)
   | 'daily_schedule' // 首页今日放送 (嵌入卡片)
   | 'home_above_history' // 首页历史播放上方 (横条)
+  | 'home_above_leaderboards' // 首页排行榜上方 (横条)
+  | 'home_above_trending' // 首页热门番剧上方 (横条)
   | 'home_above_movies' // 首页剧场版上方 (横条)
   | 'home_above_ovas' // 首页 OVA 特别篇上方 (横条)
   | 'watch_mid_section' // 播放页选集与推荐之间 (横条)
@@ -72,6 +74,20 @@ export const HIGHLIGHT_SLOTS: readonly HighlightSlotMeta[] = [
     kind: 'banner',
     maxItems: 2,
     description: '历史观看模块正上方，支持 1 个通栏长条或 2 个半屏并排小长条',
+  },
+  {
+    key: 'home_above_leaderboards',
+    label: '首页 · 排行榜上方 (横条)',
+    kind: 'banner',
+    maxItems: 2,
+    description: '观看排行榜模块正上方，支持 1 个通栏长条或 2 个半屏并排小长条',
+  },
+  {
+    key: 'home_above_trending',
+    label: '首页 · 热门番剧上方 (横条)',
+    kind: 'banner',
+    maxItems: 2,
+    description: '热门番剧上方，支持 1 个通栏长条或 2 个半屏并排小长条',
   },
   {
     key: 'home_above_movies',
