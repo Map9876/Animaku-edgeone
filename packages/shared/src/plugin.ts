@@ -59,7 +59,7 @@ export interface ReleaseConfig {
   varName?: string
 }
 
-/** AniBaka Pipeline Step (anx-rule/2) */
+/** Animaku Pipeline Step (anx-rule/2) */
 export interface PipelineStep {
   op: string
   [key: string]: unknown
@@ -169,67 +169,18 @@ export interface PluginMeta extends PluginRule {
   id: string
   importedAt: number
   /** how the rule entered the client store */
-  source?: 'builtin' | 'import' | 'catalog'
+  source?: 'builtin' | 'import'
   /** rule engine / ecosystem type */
-  engineType?: 'anibaka' | 'kazumi' | 'adapter'
+  engineType?: 'animaku' | 'anibaka' | 'kazumi' | 'adapter'
 }
 
-/** Check if a rule is an AniBaka (anx-rule/2) pipeline rule */
+/** Check if a rule is an Animaku (anx-rule/2) pipeline rule */
 export function isAnxRule(raw: unknown): boolean {
   if (!raw || typeof raw !== 'object') return false
   const r = raw as Record<string, unknown>
   const format = String(r.format ?? '').trim().toLowerCase()
-  if (format === 'anx-rule/2') return true
+  if (format === 'anx-rule/2' || format === 'animaku-rule/2') return true
   return Array.isArray(r.search) && (Array.isArray(r.detail) || Array.isArray(r.play))
-}
-
-/** KazumiRules & AniBakaRule `index.json` entry */
-export interface PluginCatalogItem {
-  name: string
-  version: string
-  useNativePlayer: boolean
-  author: string
-  lastUpdate: number
-  antiCrawlerEnabled: boolean
-  // AniBaka & Unified Shop extensions
-  id?: string
-  shop?: 'anibaka' | 'kazumi'
-  title?: string
-  intro?: string
-  site?: string
-  badge?: string
-  labels?: string[]
-  ref?: string
-  engine?: string
-}
-
-export type PluginCatalogStatus = 'install' | 'installed' | 'update'
-
-/** Simple semver-ish compare: true if remote is newer than local*/
-export function isRemoteNewer(localVersion: string, remoteVersion: string): boolean {
-  const local = String(localVersion || '')
-    .split('.')
-    .map((s) => parseInt(s, 10) || 0)
-  const remote = String(remoteVersion || '')
-    .split('.')
-    .map((s) => parseInt(s, 10) || 0)
-  const n = Math.max(local.length, remote.length)
-  for (let i = 0; i < n; i++) {
-    const l = local[i] ?? 0
-    const r = remote[i] ?? 0
-    if (r > l) return true
-    if (r < l) return false
-  }
-  return false
-}
-
-export function catalogItemStatus(
-  installed: { name: string; version: string } | undefined,
-  remote: PluginCatalogItem,
-): PluginCatalogStatus {
-  if (!installed) return 'install'
-  if (isRemoteNewer(installed.version, remote.version)) return 'update'
-  return 'installed'
 }
 
 /**

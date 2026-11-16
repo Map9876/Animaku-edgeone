@@ -284,20 +284,6 @@ export const config = {
       process.env.VITE_BANGUMI_IMAGE_HOST,
   ),
   dandanApi: 'https://api.dandanplay.net',
-  /** KazumiRules primary + gitcode mirror (same as Kazumi ApiEndpoints) */
-  pluginShop:
-    process.env.PLUGIN_SHOP ||
-    'https://raw.githubusercontent.com/Predidit/KazumiRules/main/',
-  pluginShopMirror:
-    process.env.PLUGIN_SHOP_MIRROR ||
-    'https://raw.gitcode.com/gh_mirrors/ka/KazumiRules/raw/main/',
-  /** AniBakaRule primary + mirror (modern pipeline rules anx-rule/2) */
-  anibakaShop:
-    process.env.ANIBAKA_SHOP ||
-    'https://raw.githubusercontent.com/AniBakaBaka/AniBakaRule/main/',
-  anibakaShopMirror:
-    process.env.ANIBAKA_SHOP_MIRROR ||
-    'https://raw.githubusercontents.com/AniBakaBaka/AniBakaRule/main/',
   /**
    * Public site origin for sitemap / robots (no trailing slash).
    * e.g. https://anime.example.com — when empty, robots/sitemap use request Host.

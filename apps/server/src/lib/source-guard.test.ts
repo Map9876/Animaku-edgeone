@@ -106,18 +106,19 @@ test('assertOwnSourceUrl: validates allowed domains and rejects external/malicio
   )
 })
 
-test('searchJzacg: strictly falls back to official JZACG domain when malicious baseURL is provided', async () => {
-  const { searchJzacg, JZACG_BASE_URL } = await import('./jzacg')
-  const maliciousRule = {
-    name: 'jzacg',
-    baseURL: 'https://attacker-ssrf.com',
-  }
+test('jzacg safeBaseUrl: rejects malicious baseURL and strictly falls back to official domain', async () => {
+  const { JZACG_BASE_URL } = await import('./jzacg')
+  const maliciousBase = 'https://attacker-ssrf.com'
+  const allowed = ['jzacg.com', 'jzacg.top', 'jzacg.net']
 
-  // 搜索关键字触发
-  const result = await searchJzacg(maliciousRule as any, '海贼王')
-  // 检查 diagnostics，确保请求的绝对不是 attacker-ssrf.com，而是官方默认域名
-  if (result.diagnostics && result.diagnostics.length > 0) {
-    const diagText = result.diagnostics.join(' ')
-    assert.equal(diagText.includes('attacker-ssrf.com'), false, '绝不能向恶意 baseURL 发起请求')
-  }
+  assert.equal(
+    resolveSafeBaseUrl(maliciousBase, JZACG_BASE_URL, allowed),
+    JZACG_BASE_URL,
+    '恶意 baseURL 必须被拦截并强制回退至官方 JZACG_BASE_URL',
+  )
+  assert.equal(
+    resolveSafeBaseUrl('https://jzacg.top', JZACG_BASE_URL, allowed),
+    'https://jzacg.top',
+    '合法镜像允许通过',
+  )
 })

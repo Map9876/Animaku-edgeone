@@ -115,7 +115,7 @@ export function resolveUpstreamKey(rule: PluginRule): string {
   if (builtinId) return builtinId
 
   // 2. 自定义规则：尝试提取目标网络 Hostname
-  // 2.1 检查 AniBaka V2 pipeline 规则
+  // 2.1 检查 Animaku V2 pipeline 规则
   if (Array.isArray(rule.search)) {
     for (const step of rule.search) {
       if (step && typeof step === 'object') {

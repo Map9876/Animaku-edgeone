@@ -1,6 +1,10 @@
 /**
  * cycani.org (次元城动画) dedicated adapter.
  *
+ * Note on Region / Network Block:
+ * - 源站防火墙/WAF 主动屏蔽了日本 (JP) 与韩国 (KR) 的机房 IP（访问直接 403 或连接超时）。
+ * - 若服务端部署在 JP/KR 地区的 VPS，需通过 SOURCE_PROXY_MAP 或 SOURCE_PROXY_CYCANI 配置专属代理转发。
+ *
  * Architecture:
  * - Frontend: Vite + React SPA (cycani.org)
  * - Backend: Go/Gin RESTful JSON API

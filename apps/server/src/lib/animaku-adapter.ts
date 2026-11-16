@@ -239,7 +239,7 @@ async function runStep(step: PipelineStep, ctx: PipelineContext): Promise<void> 
   const op = (step.op || '').trim()
   const handler = OP_HANDLERS[op]
   if (!handler) {
-    console.warn(`[anibaka-adapter] 未知 op: ${op}`)
+    console.warn(`[animaku-adapter] 未知 op: ${op}`)
     return
   }
   await handler(step, ctx)
@@ -361,10 +361,10 @@ const OP_HANDLERS: Record<string, OpHandler> = {
         ctx.value = ''
         return
       }
-      ctx.value = await readTextLimited(res, 2_500_000, 'anibaka-fetch')
+      ctx.value = await readTextLimited(res, 2_500_000, 'animaku-fetch')
       ctx.pageUrl = url
     } catch (e) {
-      console.warn(`[anibaka-adapter] fetch 失败: ${url}`, e)
+      console.warn(`[animaku-adapter] fetch 失败: ${url}`, e)
       ctx.value = ''
     }
   },
@@ -426,7 +426,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
         ctx.value = m && group <= m.length - 1 ? m[group] ?? '' : ''
       }
     } catch (e) {
-      console.warn(`[anibaka-adapter] regex 错误: ${patternStr}`, e)
+      console.warn(`[animaku-adapter] regex 错误: ${patternStr}`, e)
       ctx.value = ''
     }
   },
@@ -561,10 +561,10 @@ const OP_HANDLERS: Record<string, OpHandler> = {
           break
         }
         default:
-          console.warn(`[anibaka-adapter] 未知 crypto 算法: ${algo}`)
+          console.warn(`[animaku-adapter] 未知 crypto 算法: ${algo}`)
       }
     } catch (e) {
-      console.warn(`[anibaka-adapter] crypto 错误: ${algo}`, e)
+      console.warn(`[animaku-adapter] crypto 错误: ${algo}`, e)
       ctx.value = ''
     }
   },
@@ -978,7 +978,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
       ]).toString('utf8').trim()
       ctx.value = decrypted.replaceAll('\\/', '/')
     } catch (e) {
-      console.warn('[anibaka-adapter] playerDecrypt 失败', e)
+      console.warn('[animaku-adapter] playerDecrypt 失败', e)
       ctx.value = ''
     }
   },
@@ -1037,7 +1037,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
       try {
         const res = await fetchPublic(url, { headers }, { timeoutMs: 10_000, source: ctx.rule.name })
         if (!res.ok) continue
-        const text = await readTextLimited(res, 2_500_000, 'anibaka-maccms')
+        const text = await readTextLimited(res, 2_500_000, 'animaku-maccms')
         const json = asJson(text)
         const listPathStr = String(step.listPath ?? 'list')
         const found = jsonPath(json, listPathStr)
@@ -1076,7 +1076,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
     try {
       const res = await fetchPublic(url, {}, { timeoutMs: 10_000, source: ctx.rule.name })
       if (!res.ok) return
-      const text = await readTextLimited(res, 2_500_000, 'anibaka-anime1-catalog')
+      const text = await readTextLimited(res, 2_500_000, 'animaku-anime1-catalog')
       const catalog = JSON.parse(text)
       if (!Array.isArray(catalog)) return
 
@@ -1098,7 +1098,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
         }
       }
     } catch (e) {
-      console.warn('[anibaka-adapter] anime1Search 失败', e)
+      console.warn('[animaku-adapter] anime1Search 失败', e)
     }
   },
 
@@ -1114,7 +1114,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
     try {
       const res = await fetchPublic(firstUrl, {}, { timeoutMs: 12_000, source: ctx.rule.name })
       if (!res.ok) return
-      const html = await readTextLimited(res, 2_500_000, 'anibaka-anime1-detail')
+      const html = await readTextLimited(res, 2_500_000, 'animaku-anime1-detail')
       const $ = cheerio.load(html)
       const tokens: string[] = []
       $('video[data-apireq]').each((_, el) => {
@@ -1132,7 +1132,7 @@ const OP_HANDLERS: Record<string, OpHandler> = {
         })
       }
     } catch (e) {
-      console.warn('[anibaka-adapter] anime1Detail 失败', e)
+      console.warn('[animaku-adapter] anime1Detail 失败', e)
     }
   },
 
@@ -1258,6 +1258,6 @@ export async function resolveAnx(
       diagnostics: [],
     }
   } catch (e) {
-    throw new Error(`[AniBaka] 直链解析失败: ${e instanceof Error ? e.message : String(e)}`)
+    throw new Error(`[Animaku] 直链解析失败: ${e instanceof Error ? e.message : String(e)}`)
   }
 }

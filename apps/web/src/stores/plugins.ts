@@ -84,21 +84,16 @@ function toMeta(
   enabled = true,
 ): PluginMeta {
   const baseKey = (rule.id || rule.name).trim()
-  const origin =
-    source === 'catalog'
-      ? isAnxRule(rule)
-        ? 'anibaka'
-        : 'kazumi'
-      : source
   const rawRule = rule as unknown as { enabled?: boolean }
   const effectiveEnabled = typeof rawRule.enabled === 'boolean' ? rawRule.enabled : enabled
   return {
     ...rule,
-    id: `${baseKey}-${origin}`,
+    id: `${baseKey}-${source}`,
     enabled: effectiveEnabled,
     proxy: rule.requiresFullMediaProxy === true ? true : undefined,
     importedAt: Date.now(),
     source,
+    engineType: isAnxRule(rule) ? 'animaku' : 'adapter',
   }
 }
 
@@ -129,10 +124,11 @@ const BUILTIN_NAMES = new Set(
 
 export function isBuiltinPlugin(plugin: PluginMeta): boolean {
   if (plugin.source === 'builtin') return true
-  if (plugin.source === 'catalog' || plugin.source === 'import') return false
+  if (plugin.source === 'import') return false
   const id = (plugin.id || '').toLowerCase()
   if (id.endsWith('-builtin')) return true
   if (
+    id.endsWith('-animaku') ||
     id.endsWith('-anibaka') ||
     id.endsWith('-kazumi') ||
     id.endsWith('-import')
@@ -354,7 +350,7 @@ export const usePluginStore = create<PluginState>()(
         const plugins = normalizePlugins(get().plugins)
         const ver = get().defaultsVersion ?? 0
         // Empty → seed; version bump → re-seed only if still purely old built-ins
-        // or empty. User-imported/catalog rules are kept.
+        // or empty. User-imported rules are kept.
         if (plugins.length === 0) {
           const seeded = seedFromDefaultsWithSiteOverrides()
           set({
@@ -365,7 +361,7 @@ export const usePluginStore = create<PluginState>()(
           return
         }
         // Already on current defaults version: still merge any *new* built-ins
-        // and sync weights without touching user/catalog rules; apply new ordering strategy.
+        // and sync weights without touching user-imported rules; apply new ordering strategy.
         if (ver >= PLUGIN_DEFAULTS_VERSION) {
           const seedByName = new Map(
             seedFromDefaults().map((p) => [p.name.toLowerCase(), p]),
@@ -473,7 +469,7 @@ export const usePluginStore = create<PluginState>()(
         // Mixed store: add any new built-ins; drop retired default 7sefun/otage
         // only when it was backend marked builtin (user re-import keeps source=import).
         // Also align *builtin* rule definitions and adBlocker/proxy flags to current
-        // DEFAULT_PLUGIN_RULES without overwriting user/catalog rules.
+        // DEFAULT_PLUGIN_RULES without overwriting user-imported rules.
         const seedByName = new Map(
           seedFromDefaults().map((p) => [p.name.toLowerCase(), p]),
         )

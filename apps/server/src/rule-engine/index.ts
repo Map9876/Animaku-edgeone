@@ -1040,9 +1040,9 @@ export async function searchWithRule(
     }
   }
 
-  // AniBaka pipeline rules (anx-rule/2)
+  // Animaku pipeline rules (anx-rule/2)
   {
-    const { isAnxRule, searchAnx } = await import('../lib/anibaka-adapter')
+    const { isAnxRule, searchAnx } = await import('../lib/animaku-adapter')
     if (isAnxRule(rule)) {
       return await searchAnx(rule, keyword)
     }
@@ -1494,9 +1494,9 @@ export async function chaptersWithRule(
     }
   }
 
-  // AniBaka pipeline rules (anx-rule/2)
+  // Animaku pipeline rules (anx-rule/2)
   {
-    const { isAnxRule, chaptersAnx } = await import('../lib/anibaka-adapter')
+    const { isAnxRule, chaptersAnx } = await import('../lib/animaku-adapter')
     if (isAnxRule(rule)) {
       return await chaptersAnx(rule, source)
     }
@@ -2081,9 +2081,9 @@ export async function resolvePlay(
     }
   }
 
-  // AniBaka pipeline rules (anx-rule/2)
+  // Animaku pipeline rules (anx-rule/2)
   {
-    const { isAnxRule, resolveAnx } = await import('../lib/anibaka-adapter')
+    const { isAnxRule, resolveAnx } = await import('../lib/animaku-adapter')
     if (isAnxRule(rule)) {
       return wrapResolveWithTicket(rule, await resolveAnx(rule, pageUrl))
     }
