@@ -213,12 +213,12 @@ export function HomeLeaderboards() {
 
       {/* 左右双栏结构 (桌面端 2 大卡片并排，移动端上下折叠) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* 左模块：热门排行榜 */}
+        {/* 左模块：观看排行榜 */}
         <div className="kz-surface flex flex-col justify-between overflow-hidden rounded-2xl border border-[var(--kz-border)]/60 p-4 shadow-xs">
           {/* 1. 小标题与卡片头部 */}
           <div className="mb-3.5 flex items-center justify-between gap-2">
             <span className="text-[14px] font-bold text-[var(--kz-fg)]">
-              热门排行
+              观看排行
             </span>
             {/* 日 / 周 / 月 Tab 切换：方案 1 樱花粉活力胶囊 */}
             <div className="flex items-center rounded-full bg-[var(--kz-bg-soft)] p-0.5 text-[11.5px] ring-1 ring-[var(--kz-border)]/50">
