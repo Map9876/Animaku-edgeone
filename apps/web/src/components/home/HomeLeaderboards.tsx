@@ -114,7 +114,7 @@ function LeaderboardPosterCard({
   )
 }
 
-function LeaderboardSkeletonCard() {
+function LeaderboardSkeletonCard(_props?: { rank?: number }) {
   return (
     <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-[var(--kz-bg-soft)] ring-1 ring-[var(--kz-border)] animate-pulse pointer-events-none" />
   )

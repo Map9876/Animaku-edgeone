@@ -9,6 +9,7 @@ import { DocumentSeo } from './DocumentSeo'
 import { SiteFooter } from './SiteFooter'
 import { LoginModal } from './LoginModal'
 import { Navbar } from './nav/Navbar'
+import { BackToTopMascot } from './BackToTopMascot'
 
 export function Layout() {
   const isReducedMotion = useReducedMotion()
@@ -82,6 +83,9 @@ export function Layout() {
 
       {/* 全局登录与账号绑定控制面板 */}
       <LoginModal />
+
+      {/* 桌面端右下角看板娘回到顶部挂件 */}
+      <BackToTopMascot />
     </div>
   )
 }
