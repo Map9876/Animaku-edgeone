@@ -30,7 +30,7 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
-import { assertOwnSourceUrl } from './source-guard'
+import { assertOwnSourceUrl, resolveSafeBaseUrl } from './source-guard'
 
 const MIFUN_DEFAULT_BASE_URL = 'https://ios.mifun.org'
 const MIFUN_ALLOWED_HOSTS = ['mifun.org', 'mifun.cc', 'mifun.tv']
@@ -46,10 +46,7 @@ export function isMifunRule(rule: PluginRule): boolean {
 }
 
 function getBaseUrl(rule?: PluginRule): string {
-  if (rule?.baseURL && /^https?:\/\//i.test(rule.baseURL)) {
-    return rule.baseURL.replace(/\/+$/, '')
-  }
-  return MIFUN_DEFAULT_BASE_URL
+  return resolveSafeBaseUrl(rule?.baseURL, MIFUN_DEFAULT_BASE_URL, MIFUN_ALLOWED_HOSTS)
 }
 
 function getHtmlHeaders(referer?: string): Record<string, string> {

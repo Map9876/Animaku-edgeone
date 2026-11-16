@@ -8,7 +8,8 @@ import {
 import { config } from '../config'
 import { fetchPublic } from '../lib/private-host'
 import { setDanmakuCdnHeaders } from '../lib/cdn-cache-headers'
-import { cacheGetOrSet, wantsCacheBypass } from '../lib/ttl-cache'
+import { fetchDanmakuWithGuard } from '../lib/danmaku-guard'
+import { SourceRateLimitError } from '../lib/source-rate-limit'
 import { getBilibiliTargetByBangumiId } from '../lib/bangumi-data'
 
 /**
@@ -276,7 +277,6 @@ bilibiliDanmakuRoutes.get('/bilibili', async (c) => {
       : target.page !== undefined && target.page >= 0
         ? target.page
         : 1
-  const bypass = wantsCacheBypass(c)
 
   let cacheKey = ''
   if (target.type === 'ep') {
@@ -292,10 +292,13 @@ bilibiliDanmakuRoutes.get('/bilibili', async (c) => {
   }
 
   try {
-    const { value: result, hit } = await cacheGetOrSet(
+    const { value: result, hit, bypassUsed } = await fetchDanmakuWithGuard({
+      c,
+      upstreamKey: 'bilibili',
       cacheKey,
-      BILI_CACHE_TTL,
-      async () => {
+      ttlMs: BILI_CACHE_TTL,
+      keyPrefix: 'bili:',
+      loader: async () => {
         let cid = 0
         let title = ''
         let part = ''
@@ -590,17 +593,23 @@ bilibiliDanmakuRoutes.get('/bilibili', async (c) => {
           },
         }
       },
-      { bypass, keyPrefix: 'bili:' },
-    )
+    })
 
     c.header('X-Cache', hit ? 'HIT' : 'MISS')
-    setDanmakuCdnHeaders(c, bypass)
+    setDanmakuCdnHeaders(c, bypassUsed)
     return c.json({
       data: result.comments,
       count: result.comments.length,
       meta: result.meta,
     })
   } catch (e) {
+    if (e instanceof SourceRateLimitError) {
+      c.header('Retry-After', String(e.retryAfterSec))
+      return c.json(
+        { error: 'rate_limited', message: e.message, retryAfter: e.retryAfterSec },
+        429,
+      )
+    }
     const message = e instanceof Error ? e.message : String(e)
     console.warn(`[bilibili-danmaku] 拉取弹幕未成功: ${message}`)
     return c.json(

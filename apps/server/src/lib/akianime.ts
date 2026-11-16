@@ -26,9 +26,15 @@ import {
 import * as cheerio from 'cheerio'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
-import { assertOwnSourceUrl } from './source-guard'
+import { assertOwnSourceUrl, resolveSafeBaseUrl } from './source-guard'
 
 const AKIANIME_BASE_URL = 'https://www.akianime.cc'
+const AKIANIME_ALLOWED_HOSTS = [
+  'akianime.cc',
+  'akianime.com',
+  'akianime.site',
+  'akianime.top',
+]
 const ANIPLAYER_BASE_URL = 'https://aniplayer.xn--gmqr9gevarqk8t.cn'
 const ANIPLAYER_API_URL = `${ANIPLAYER_BASE_URL}/api_config.php`
 
@@ -164,13 +170,8 @@ export async function chaptersAkianime(
   rule: PluginRule,
   detailUrl: string,
 ): Promise<PluginChapterResult> {
-  const baseUrl = rule.baseURL || AKIANIME_BASE_URL
-  const safeDetailUrl = assertOwnSourceUrl(detailUrl, baseUrl, [
-    'akianime.cc',
-    'akianime.com',
-    'akianime.site',
-    'akianime.top',
-  ])
+  const baseUrl = resolveSafeBaseUrl(rule.baseURL, AKIANIME_BASE_URL, AKIANIME_ALLOWED_HOSTS)
+  const safeDetailUrl = assertOwnSourceUrl(detailUrl, baseUrl, AKIANIME_ALLOWED_HOSTS)
   assertPublicHttpUrl(safeDetailUrl)
 
   const res = await fetchPublic(
@@ -297,13 +298,8 @@ export async function resolveAkianime(
   rule: PluginRule,
   episodeUrl: string,
 ): Promise<ResolvePlayResult> {
-  const baseUrl = rule.baseURL || AKIANIME_BASE_URL
-  const safeEpisodeUrl = assertOwnSourceUrl(episodeUrl, baseUrl, [
-    'akianime.cc',
-    'akianime.com',
-    'akianime.site',
-    'akianime.top',
-  ])
+  const baseUrl = resolveSafeBaseUrl(rule.baseURL, AKIANIME_BASE_URL, AKIANIME_ALLOWED_HOSTS)
+  const safeEpisodeUrl = assertOwnSourceUrl(episodeUrl, baseUrl, AKIANIME_ALLOWED_HOSTS)
   assertPublicHttpUrl(safeEpisodeUrl)
 
   const res = await fetchPublic(

@@ -25,7 +25,7 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
-import { assertOwnSourceUrl } from './source-guard'
+import { assertOwnSourceUrl, resolveSafeBaseUrl } from './source-guard'
 
 const MOONCI_BASE_URL = 'https://www.moonci.com'
 const MOONCI_ALLOWED_HOSTS = ['moonci.com']
@@ -283,7 +283,7 @@ export async function resolveMoonci(
   rule: PluginRule,
   pageUrl: string,
 ): Promise<ResolvePlayResult> {
-  const effectiveBase = rule.baseURL || MOONCI_BASE_URL
+  const effectiveBase = resolveSafeBaseUrl(rule.baseURL, MOONCI_BASE_URL, MOONCI_ALLOWED_HOSTS)
   const absPlayUrl = assertOwnSourceUrl(pageUrl, effectiveBase, MOONCI_ALLOWED_HOSTS)
   assertPublicHttpUrl(absPlayUrl)
 

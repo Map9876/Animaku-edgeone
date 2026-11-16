@@ -1,6 +1,41 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { assertOwnSourceUrl } from './source-guard'
+import { assertOwnSourceUrl, resolveSafeBaseUrl } from './source-guard'
+
+test('resolveSafeBaseUrl: validates client-provided baseURL and protects against arbitrary proxying', () => {
+  const official = 'https://animoe.org'
+  const mirrors = ['animoe.org', 'animoe.net']
+
+  // 1. Valid mirror adopted
+  assert.equal(
+    resolveSafeBaseUrl('https://animoe.net', official, mirrors),
+    'https://animoe.net',
+  )
+  assert.equal(
+    resolveSafeBaseUrl('https://sub.animoe.org/', official, mirrors),
+    'https://sub.animoe.org',
+  )
+
+  // 2. Malicious / external baseURL rejected, falls back to official default
+  assert.equal(
+    resolveSafeBaseUrl('https://attacker.com', official, mirrors),
+    'https://animoe.org',
+  )
+  assert.equal(
+    resolveSafeBaseUrl('https://evil-animoe.org', official, mirrors),
+    'https://animoe.org',
+  )
+  assert.equal(
+    resolveSafeBaseUrl('', official, mirrors),
+    'https://animoe.org',
+  )
+
+  // 3. assertOwnSourceUrl rejects external URL even if malicious baseURL was attempted
+  assert.throws(
+    () => assertOwnSourceUrl('https://attacker.com/evil.html', 'https://attacker.com', mirrors),
+    /is not an allowed domain/,
+  )
+})
 
 test('assertOwnSourceUrl: validates allowed domains and rejects external/malicious targets', () => {
   const base = 'https://animoe.org'

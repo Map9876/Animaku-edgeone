@@ -19,7 +19,7 @@ import {
 import { config } from '../config'
 import { fetchPublic } from './private-host'
 import { keywordVariantsZh } from './opencc-s2t'
-import { assertOwnSourceUrl } from './source-guard'
+import { assertOwnSourceUrl, resolveSafeBaseUrl } from './source-guard'
 
 const SITE = 'https://anime1.me'
 const ANIME1_ALLOWED_HOSTS = ['anime1.me', 'v.anime1.me']
@@ -321,7 +321,7 @@ export async function chaptersAnime1(
   source: string,
 ): Promise<PluginChapterResult> {
   const diagnostics: string[] = []
-  const effectiveSite = rule.baseURL || SITE
+  const effectiveSite = resolveSafeBaseUrl(rule.baseURL, SITE, ANIME1_ALLOWED_HOSTS)
   let url = source.trim()
   if (/^\d+$/.test(url)) {
     url = `${effectiveSite}/?cat=${url}`
@@ -441,7 +441,7 @@ export async function resolveAnime1(
   pageUrl: string,
 ): Promise<ResolvePlayResult> {
   const diagnostics: string[] = []
-  const effectiveSite = rule.baseURL || SITE
+  const effectiveSite = resolveSafeBaseUrl(rule.baseURL, SITE, ANIME1_ALLOWED_HOSTS)
   const abs = assertOwnSourceUrl(pageUrl, effectiveSite, ANIME1_ALLOWED_HOSTS)
   diagnostics.push(`集页 ${abs}`)
 

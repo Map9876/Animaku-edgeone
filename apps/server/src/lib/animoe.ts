@@ -28,9 +28,10 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
-import { assertOwnSourceUrl } from './source-guard'
+import { assertOwnSourceUrl, resolveSafeBaseUrl } from './source-guard'
 
 const ANIMOE_DEFAULT_BASE_URL = 'https://animoe.org'
+const ANIMOE_ALLOWED_HOSTS = ['animoe.org', 'animoe.net', 'animoe.me']
 
 export function isAnimoeRule(rule: PluginRule): boolean {
   const name = (rule.name || '').toLowerCase().trim()
@@ -42,10 +43,7 @@ export function isAnimoeRule(rule: PluginRule): boolean {
 }
 
 function getBaseUrl(rule?: PluginRule): string {
-  if (rule?.baseURL && /^https?:\/\//i.test(rule.baseURL)) {
-    return rule.baseURL.replace(/\/+$/, '')
-  }
-  return ANIMOE_DEFAULT_BASE_URL
+  return resolveSafeBaseUrl(rule?.baseURL, ANIMOE_DEFAULT_BASE_URL, ANIMOE_ALLOWED_HOSTS)
 }
 
 function getHtmlHeaders(referer?: string): Record<string, string> {

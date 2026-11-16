@@ -22,7 +22,7 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
-import { assertOwnSourceUrl } from './source-guard'
+import { assertOwnSourceUrl, resolveSafeBaseUrl } from './source-guard'
 
 export const JZACG_BASE_URL = 'https://www.jzacg.com'
 const JZACG_ALLOWED_HOSTS = ['jzacg.com', 'jzacg.top', 'jzacg.net']
@@ -192,7 +192,7 @@ export async function chaptersJzacg(
   rule: PluginRule,
   source: string,
 ): Promise<PluginChapterResult> {
-  const effectiveBase = (rule.baseURL || JZACG_BASE_URL).replace(/\/+$/, '')
+  const effectiveBase = resolveSafeBaseUrl(rule.baseURL, JZACG_BASE_URL, JZACG_ALLOWED_HOSTS)
   const absDetailUrl = assertOwnSourceUrl(source, effectiveBase, JZACG_ALLOWED_HOSTS)
   assertPublicHttpUrl(absDetailUrl)
 
@@ -412,7 +412,7 @@ export async function resolveJzacg(
   rule: PluginRule,
   pageUrl: string,
 ): Promise<ResolvePlayResult> {
-  const effectiveBase = (rule.baseURL || JZACG_BASE_URL).replace(/\/+$/, '')
+  const effectiveBase = resolveSafeBaseUrl(rule.baseURL, JZACG_BASE_URL, JZACG_ALLOWED_HOSTS)
   const absPlayUrl = assertOwnSourceUrl(pageUrl, effectiveBase, JZACG_ALLOWED_HOSTS)
   assertPublicHttpUrl(absPlayUrl)
 

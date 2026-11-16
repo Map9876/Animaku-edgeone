@@ -34,7 +34,7 @@ import {
 } from '@animaku/shared'
 import { config } from '../config'
 import { assertPublicHttpUrl, fetchPublic } from './private-host'
-import { assertOwnSourceUrl } from './source-guard'
+import { assertOwnSourceUrl, resolveSafeBaseUrl } from './source-guard'
 
 const BIMI_DEFAULT_BASE_URL = 'https://www.bimiacg14.net'
 const BIMI_ALLOWED_HOSTS = [
@@ -58,10 +58,7 @@ export function isBimiRule(rule: PluginRule): boolean {
 }
 
 function getBaseUrl(rule?: PluginRule): string {
-  if (rule?.baseURL && /^https?:\/\//i.test(rule.baseURL)) {
-    return rule.baseURL.replace(/\/+$/, '')
-  }
-  return BIMI_DEFAULT_BASE_URL
+  return resolveSafeBaseUrl(rule?.baseURL, BIMI_DEFAULT_BASE_URL, BIMI_ALLOWED_HOSTS)
 }
 
 function getBaseHeaders(referer?: string, cookie?: string): Record<string, string> {
