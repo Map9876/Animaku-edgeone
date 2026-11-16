@@ -321,7 +321,7 @@ export function DesktopControls(props: PlayerControlsProps) {
 
   return (
     <div
-      className={`kz-bar ${pinBar ? 'kz-bar--show' : ''}`}
+      className={`kz-bar kz-bar--desktop ${pinBar ? 'kz-bar--show' : ''}`}
       onMouseDown={(e) => e.stopPropagation()}
       data-player-chrome
     >

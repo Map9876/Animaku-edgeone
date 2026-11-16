@@ -1014,6 +1014,58 @@ html[data-theme='light'] .kz-watch-road-chip[aria-selected='true'] {
   gap: 0;
 }
 
+/* ─── Desktop-specific Spacious Layout (Bilibili-style breathing room) ─── */
+.kz-bar--desktop {
+  --kz-ctrl-h: 36px;
+  padding: 0.4rem 0.85rem max(0.6rem, calc(env(safe-area-inset-bottom, 0px) + 0.45rem));
+}
+
+.kz-bar--desktop .kz-bar-left {
+  gap: 8px;
+}
+
+.kz-bar--desktop .kz-bar-right {
+  gap: clamp(10px, 1.25vw, 16px);
+}
+
+.kz-bar--desktop .kz-bar-left > *,
+.kz-bar--desktop .kz-bar-right > * {
+  margin: 0;
+}
+
+.kz-bar--desktop .kz-ctrl-icon {
+  width: var(--kz-ctrl-h);
+  min-width: var(--kz-ctrl-h);
+}
+
+.kz-bar--desktop .kz-speed-btn {
+  width: auto;
+  min-width: 38px;
+  padding: 0 6px;
+  font-size: 13px;
+}
+
+/* 桌面端弹幕开关与倍速：常态不使用生硬灰底方块，呈现通透纯净视觉 */
+.kz-bar--desktop .kz-ctrl-icon[data-state='on'],
+.kz-bar--desktop .kz-ctrl-icon[data-state='simplify'] {
+  background: transparent;
+}
+
+.kz-bar--desktop .kz-ctrl-icon[data-state='on']:hover,
+.kz-bar--desktop .kz-ctrl-icon[data-state='simplify']:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.kz-bar--desktop .kz-speed-btn[data-active='true'] {
+  background: transparent;
+  color: var(--brand_blue, #00AEEC);
+  font-weight: 700;
+}
+
+.kz-bar--desktop .kz-speed-btn[data-active='true']:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .kz-bar-left > *,
 .kz-bar-right > * {
   flex-shrink: 0;
@@ -2187,6 +2239,19 @@ body.kz-has-web-fs header {
 @container kz-player (max-width: 720px) {
   .kz-bar {
     padding: 0.2rem 0.35rem 0.35rem;
+  }
+
+  .kz-bar--desktop {
+    --kz-ctrl-h: 32px;
+    padding: 0.2rem 0.35rem 0.35rem;
+  }
+
+  .kz-bar--desktop .kz-bar-left {
+    gap: 4px;
+  }
+
+  .kz-bar--desktop .kz-bar-right {
+    gap: 4px;
   }
 
   .kz-bar-row {
