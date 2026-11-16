@@ -4,6 +4,7 @@ import { bangumiOAuthUrl } from '@animaku/shared'
 import { Modal } from './Modal'
 import { KzButton, KzInput } from './ui'
 import { useAuthStore } from '../stores/auth'
+import { useSiteConfigStore } from '../stores/site-config'
 import { useSiteBranding } from '../lib/site-branding'
 
 /**
@@ -18,63 +19,19 @@ function generateRandomCaptcha(): string {
   return res
 }
 
-/**
- * 萌系猫咪头像 SVG（参考设计图顶部圆形猫咪图标）
- */
-function CuteCatAvatar({ className = 'w-16 h-16' }: { className?: string }) {
-  return (
-    <div
-      className={`relative rounded-full p-1 bg-gradient-to-b from-pink-50 to-pink-100 dark:from-pink-950/40 dark:to-neutral-900 border-2 border-pink-200/80 dark:border-pink-800/40 shadow-sm flex items-center justify-center shrink-0 ${className}`}
-    >
-      <svg
-        viewBox="0 0 100 100"
-        className="w-full h-full drop-shadow-xs"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        {/* 猫耳外侧 */}
-        <polygon points="20,40 12,12 42,24" fill="#FFE4E8" stroke="#F48FB1" strokeWidth="2.5" strokeLinejoin="round" />
-        <polygon points="80,40 88,12 58,24" fill="#FFE4E8" stroke="#F48FB1" strokeWidth="2.5" strokeLinejoin="round" />
-        {/* 猫耳内耳 */}
-        <polygon points="23,36 18,18 38,25" fill="#F8BBD0" />
-        <polygon points="77,36 82,18 62,25" fill="#F8BBD0" />
-        {/* 头部圆轮廓 */}
-        <ellipse cx="50" cy="55" rx="38" ry="34" fill="#FFFFFF" stroke="#F48FB1" strokeWidth="2.5" />
-        {/* 头顶毛发微小装饰 */}
-        <path d="M47,23 Q50,18 53,23" stroke="#F48FB1" strokeWidth="2" fill="none" strokeLinecap="round" />
-        {/* 腮红 */}
-        <circle cx="27" cy="62" r="6.5" fill="#FF80AB" opacity="0.45" />
-        <circle cx="73" cy="62" r="6.5" fill="#FF80AB" opacity="0.45" />
-        {/* 眼睛（灵动开心弧度） */}
-        <circle cx="36" cy="52" r="4.2" fill="#4A1525" />
-        <circle cx="34.5" cy="50.5" r="1.5" fill="#FFFFFF" />
-        <circle cx="64" cy="52" r="4.2" fill="#4A1525" />
-        <circle cx="62.5" cy="50.5" r="1.5" fill="#FFFFFF" />
-        {/* 鼻子 */}
-        <polygon points="48,60 52,60 50,62.5" fill="#F06292" />
-        {/* 嘴巴（小猫 W 微笑） */}
-        <path
-          d="M44,64 Q47,68 50,64 Q53,68 56,64"
-          fill="none"
-          stroke="#4A1525"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        {/* 胡须 */}
-        <line x1="16" y1="57" x2="26" y2="59" stroke="#F48FB1" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="15" y1="64" x2="25" y2="63" stroke="#F48FB1" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="84" y1="57" x2="74" y2="59" stroke="#F48FB1" strokeWidth="1.8" strokeLinecap="round" />
-        <line x1="85" y1="64" x2="75" y2="63" stroke="#F48FB1" strokeWidth="1.8" strokeLinecap="round" />
-      </svg>
-    </div>
-  )
-}
-
 export function LoginModal() {
   const isOpen = useAuthStore((s) => s.isLoginModalOpen)
   const closeModal = useAuthStore((s) => s.closeLoginModal)
   const login = useAuthStore((s) => s.login)
   const b = useSiteBranding()
+  const iconMode = useSiteConfigStore((s) => s.iconMode)
+  const iconUrl = useSiteConfigStore((s) => s.iconUrl)
+  const iconUpdatedAt = useSiteConfigStore((s) => s.iconUpdatedAt)
+
+  const logoSrc =
+    iconMode === 'url' && iconUrl
+      ? iconUrl
+      : `/logo.png${iconUpdatedAt ? `?v=${iconUpdatedAt}` : ''}`
 
   // 选项卡：'bangumi' 为默认的 Bangumi Token，'account' 为账号密码
   const [activeTab, setActiveTab] = useState<'bangumi' | 'account'>('bangumi')
@@ -206,9 +163,24 @@ export function LoginModal() {
           </svg>
         </button>
 
-        {/* 顶部萌宠头像 */}
+        {/* 顶部站点品牌 Logo */}
         <div className="flex justify-center">
-          <CuteCatAvatar className="w-[72px] h-[72px]" />
+          <div className="relative flex items-center justify-center rounded-full p-1.5 bg-gradient-to-b from-[var(--kz-bg-soft)] to-[var(--kz-bg-elevated)] border-2 border-[var(--kz-border)] shadow-md shrink-0 w-[72px] h-[72px] overflow-hidden">
+            <img
+              src={logoSrc}
+              alt={b.productName}
+              width={64}
+              height={64}
+              className="w-full h-full rounded-full object-cover"
+              decoding="async"
+              onError={(e) => {
+                const target = e.currentTarget
+                if (!target.src.endsWith('/logo.png')) {
+                  target.src = '/logo.png'
+                }
+              }}
+            />
+          </div>
         </div>
 
         {/* 标题与欢迎语 */}
