@@ -1,23 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 
 /**
  * 桌面端右下角看板娘（点击回到顶部）
  * - 仅在桌面宽屏（>=1280px / xl）展示，全屏与移动端自动隐藏
- * - 页面向下滚动超过 240px 后，采用 Q 弹 Spring 动效探出
+ * - 页面向下滚动超过 240px 后，采用 GPU 合成器超调贝塞尔（cubic-bezier）优雅探出
  * - 回到顶部退场时采用平滑缓动（0.38s）优雅缩回
- * - 交互 Hitbox 与动效层彻底解耦，杜绝边缘悬停时的死循环抽搐（动画打架）
- * - 双端性能调优：
- *   1. 动效解耦：X 轴 100% 保留原本 Spring 物理弹性，Opacity 走平滑硬件淡入，彻底规避 Safari 透明度超调掉帧
- *   2. 数值位移替代百分比，消除 Safari 每帧盒模型几何重算
- *   3. 消除图层冲突并开启 WebKit 硬件图层固化，杜绝 drop-shadow 滤镜实时反复光栅化
- *   4. 滚动监听精细化，避免惯性滚动与 JS 弹簧争抢主线程
+ * - 架构调优（100% 纯 CSS 合成器驱动，脱离 JS 主线程）：
+ *   1. 常驻挂载（Always Mounted）：首屏提前完成图片加载与解码，消除滚动瞬间的 DOM 插入与冷启动掉帧
+ *   2. 超调贝塞尔代替 JS Spring：transform/opacity 由浏览器 Compositor 硬件加速独立插值，杜绝 Safari 惯性滚动争抢
+ *   3. 交互 Hitbox 与纯视觉层彻底解耦：外层固定捕获鼠标，内层 group-hover 纯 CSS 探出，彻底消除抖动
+ *   4. 原生 CSS group-active 反馈：杜绝 pointer-events-none 阻断 Framer Motion 导致按下缩放失效的缺陷
  */
 export function BackToTopMascot() {
   const [isVisible, setIsVisible] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isScrolling, setIsScrolling] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
 
   const scrollTimerRef = useRef<number | null>(null)
 
@@ -71,122 +68,79 @@ export function BackToTopMascot() {
   if (isFullscreen) return null
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ x: 150, opacity: 0 }}
-          animate={{
-            x: 0,
-            opacity: 1,
-            transition: {
-              x: { type: 'spring', stiffness: 260, damping: 22 },
-              opacity: { duration: 0.22, ease: 'easeOut' },
-            },
-          }}
-          exit={{
-            x: 150,
-            opacity: 0,
-            transition: { duration: 0.38, ease: [0.32, 0.72, 0, 1] },
-          }}
-          className={`fixed right-3 bottom-8 z-40 hidden select-none xl:block focus:outline-none ${
-            isScrolling ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'
-          }`}
-          onClick={scrollToTop}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          onFocus={() => setIsHovered(true)}
-          onBlur={() => setIsHovered(false)}
-          aria-label="回到顶部"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              scrollToTop()
-            }
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label="回到顶部"
+      onClick={scrollToTop}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          scrollToTop()
+        }
+      }}
+      className={`group fixed right-3 bottom-8 z-40 hidden select-none xl:block focus:outline-none ${
+        isVisible && !isScrolling ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'
+      }`}
+      style={{
+        transform: isVisible ? 'translateX(0)' : 'translateX(150px)',
+        opacity: isVisible ? 1 : 0,
+        // 入场采用超调贝塞尔（easeOutBack）提供 Q 弹回弹，退场采用平滑贝塞尔（easeOut）干脆收回
+        transition: isVisible
+          ? 'transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.22s ease-out'
+          : 'transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.28s ease-in',
+        willChange: 'transform, opacity',
+      }}
+    >
+      {/* 纯视觉层：鼠标事件绑定在外层固定 Hitbox 上，内部位移不影响鼠标命中，且原生 active 驱动按下缩小 */}
+      <div className="pointer-events-none transition-transform duration-200 ease-out group-hover:-translate-x-2 group-active:scale-[0.94] group-active:translate-y-[2px]">
+        <div
+          className="relative"
+          style={{
+            transform: 'translateZ(0)',
+            WebkitTransform: 'translateZ(0)',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
           }}
         >
-          {/* 纯视觉层：鼠标事件绑定在外层固定 Hitbox 上，内部位移不影响鼠标命中，彻底消除悬停震荡 */}
-          <motion.div
-            animate={{
-              x: isHovered ? -8 : 0,
+          {/* 1. 受惊闪电符号：平时隐藏，鼠标 Hover 时弹跳探出（纯 CSS 超调弹性） */}
+          <div
+            style={{
+              position: 'absolute',
+              left: '0%',
+              top: '10.25%',
+              width: '27.27%',
+              transformOrigin: 'bottom right',
             }}
-            whileTap={{ scale: 0.94, y: 2 }}
-            transition={{
-              type: 'spring',
-              stiffness: 340,
-              damping: 24,
-            }}
-            className="pointer-events-none"
+            className="pointer-events-none opacity-0 scale-50 -rotate-12 transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:opacity-100 group-hover:scale-100 group-hover:rotate-0"
           >
-            {/* 固化 GPU 合成层：防止 Safari 在位移时每帧重绘 drop-shadow 滤镜 */}
-            <div
-              className="relative"
-              style={{
-                transform: 'translateZ(0)',
-                WebkitTransform: 'translateZ(0)',
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden',
-              }}
-            >
-              {/* 1. 受惊闪电符号：平时隐藏，鼠标 Hover 时弹跳探出 */}
-              <motion.div
-                initial={false}
-                animate={
-                  isHovered
-                    ? {
-                        opacity: 1,
-                        scale: 1,
-                        rotate: 0,
-                      }
-                    : {
-                        opacity: 0,
-                        scale: 0.2,
-                        rotate: -10,
-                      }
-                }
-                transition={{
-                  type: 'spring',
-                  stiffness: 380,
-                  damping: 20,
-                }}
-                style={{
-                  position: 'absolute',
-                  left: '0%',
-                  top: '10.25%',
-                  width: '27.27%',
-                  pointerEvents: 'none',
-                  transformOrigin: 'bottom right',
-                }}
-              >
-                <picture>
-                  <source srcSet="/assets/mascot-spark.webp" type="image/webp" />
-                  <img
-                    src="/assets/mascot-spark.png"
-                    alt=""
-                    aria-hidden
-                    draggable={false}
-                    decoding="async"
-                    className="h-auto w-full drop-shadow-[0_2px_8px_rgba(0,0,0,0.18)]"
-                  />
-                </picture>
-              </motion.div>
+            <picture>
+              <source srcSet="/assets/mascot-spark.webp" type="image/webp" />
+              <img
+                src="/assets/mascot-spark.png"
+                alt=""
+                aria-hidden
+                draggable={false}
+                decoding="async"
+                className="h-auto w-full drop-shadow-[0_2px_8px_rgba(0,0,0,0.18)]"
+              />
+            </picture>
+          </div>
 
-              {/* 2. 看板娘身体本体 */}
-              <picture>
-                <source srcSet="/assets/mascot-body.webp" type="image/webp" />
-                <img
-                  src="/assets/mascot-body.png"
-                  alt="回到顶部"
-                  draggable={false}
-                  decoding="async"
-                  className="h-auto w-[115px] 2xl:w-[130px] drop-shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
-                />
-              </picture>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          {/* 2. 看板娘身体本体 */}
+          <picture>
+            <source srcSet="/assets/mascot-body.webp" type="image/webp" />
+            <img
+              src="/assets/mascot-body.png"
+              alt="回到顶部"
+              draggable={false}
+              decoding="async"
+              className="h-auto w-[115px] 2xl:w-[130px] drop-shadow-[0_4px_16px_rgba(0,0,0,0.12)]"
+            />
+          </picture>
+        </div>
+      </div>
+    </div>
   )
 }
+
