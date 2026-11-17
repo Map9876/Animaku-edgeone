@@ -636,21 +636,26 @@ export class DailyRecommendService {
       })
     }
 
-    // 6. 回填 L1 内存缓存
-    DailyRecommendService.cachedDateKey = dateKey
-    DailyRecommendService.memoryCachedItems = finalRecommendations
+    // 6. 回填 L1 内存缓存与 L2 硬盘缓存（仅在产生有效推荐条目时缓存，严禁缓存空结果导致断网污染）
+    if (finalRecommendations.length > 0) {
+      DailyRecommendService.cachedDateKey = dateKey
+      DailyRecommendService.memoryCachedItems = finalRecommendations
 
-    // 7. 异步安全落盘至 L2 硬盘：有效期锁定至今日 23:59:59 (次日零点自动过期)
-    if (diskCache) {
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-      const remainingTtl = endOfDay.getTime() - now.getTime()
-      const validDuration = remainingTtl <= 0 || remainingTtl < 15 * 60_000
-        ? 4 * 3600_000
-        : remainingTtl
+      if (diskCache) {
+        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+        const remainingTtl = endOfDay.getTime() - now.getTime()
+        const validDuration = remainingTtl <= 0 || remainingTtl < 15 * 60_000
+          ? 4 * 3600_000
+          : remainingTtl
 
-      diskCache
-        .set(diskCacheKey, finalRecommendations, validDuration)
-        .catch(() => {})
+        diskCache
+          .set(diskCacheKey, finalRecommendations, validDuration)
+          .catch(() => {})
+      }
+    } else {
+      // 若因断网彻底未拿到任何条目，主动清除内存缓存，确保后续请求不会被空缓存阻断
+      DailyRecommendService.clearCache()
+      throw new Error('获取今日推荐失败，请检查网络连接')
     }
 
     return finalRecommendations

@@ -207,6 +207,7 @@ export interface WeightContext {
   boostedPluginNames?: Set<string> | string[]
   adminWeights?: Record<string, number> | null
   userWeights?: Record<string, number> | null
+  adminOldAnimePriority?: Record<string, boolean> | null
 }
 
 /**
@@ -222,26 +223,48 @@ export function getPluginTotalWeight(
   ctxOrIsOld: WeightContext | boolean = false,
   boostedPluginNames?: Set<string> | string[],
 ): number {
+  const key = (p.name || '').toLowerCase()
+  const isOld = typeof ctxOrIsOld === 'boolean' ? ctxOrIsOld : Boolean(ctxOrIsOld.isOldAnime)
+  const boosted = typeof ctxOrIsOld === 'boolean' ? boostedPluginNames : ctxOrIsOld.boostedPluginNames
+  const adminWeights = typeof ctxOrIsOld === 'object' && ctxOrIsOld ? ctxOrIsOld.adminWeights : undefined
+  const userWeights = typeof ctxOrIsOld === 'object' && ctxOrIsOld ? ctxOrIsOld.userWeights : undefined
+  const adminOldAnimePriority =
+    typeof ctxOrIsOld === 'object' && ctxOrIsOld ? ctxOrIsOld.adminOldAnimePriority : undefined
+
+  // 1. 基准分确定：
+  // 只有当用户未配置个人排序偏好时，才应用站点管理员全局基准分；
+  // 用户一旦有个性化排序，全盘由用户规则接管
+  const hasUserWeights = Boolean(
+    userWeights && typeof userWeights === 'object' && Object.keys(userWeights).length > 0,
+  )
   let base = 0
-  if (typeof p.weight === 'number' && Number.isFinite(p.weight)) {
+  const adminBaseScore =
+    !hasUserWeights &&
+    adminWeights &&
+    typeof adminWeights === 'object' &&
+    typeof adminWeights[key] === 'number'
+      ? adminWeights[key]
+      : undefined
+
+  if (adminBaseScore !== undefined) {
+    base = adminBaseScore
+  } else if (typeof p.weight === 'number' && Number.isFinite(p.weight)) {
     base = p.weight
   } else {
     base = p.source === 'builtin' ? 50 : 0
   }
 
-  const isOld = typeof ctxOrIsOld === 'boolean' ? ctxOrIsOld : Boolean(ctxOrIsOld.isOldAnime)
-  const boosted = typeof ctxOrIsOld === 'boolean' ? boostedPluginNames : ctxOrIsOld.boostedPluginNames
-  const adminWeights = typeof ctxOrIsOld === 'object' && ctxOrIsOld ? ctxOrIsOld.adminWeights : undefined
-  const userWeights = typeof ctxOrIsOld === 'object' && ctxOrIsOld ? ctxOrIsOld.userWeights : undefined
+  // 2. 老番场景加权 (+15)
+  const isOldEligible =
+    adminOldAnimePriority && typeof adminOldAnimePriority[key] === 'boolean'
+      ? adminOldAnimePriority[key]
+      : Boolean(p.oldAnimePriority)
 
-  // 1. 老番场景加权 (+15)
-  if (isOld && p.oldAnimePriority) {
+  if (isOld && isOldEligible) {
     base += 15
   }
 
-  const key = (p.name || '').toLowerCase()
-
-  // 2. 番剧专属加权 (+500)
+  // 3. 番剧专属加权 (+500)
   if (boosted) {
     const hit =
       boosted instanceof Set
@@ -252,24 +275,11 @@ export function getPluginTotalWeight(
     }
   }
 
-  // 3. 排位加权（层级覆盖制：用户自定义 > 管理员全局 > 默认）
-  // 用户一旦配置了个人排序，全权按用户个人规则生效；未配置时才回退至站点管理员全局排序
-  const hasUserWeights = Boolean(
-    userWeights && typeof userWeights === 'object' && Object.keys(userWeights).length > 0,
-  )
-  let rankBonus = 0
-  if (hasUserWeights) {
-    rankBonus =
-      userWeights && typeof userWeights[key] === 'number' ? userWeights[key] : 0
-  } else if (
-    adminWeights &&
-    typeof adminWeights === 'object' &&
-    typeof adminWeights[key] === 'number'
-  ) {
-    rankBonus = adminWeights[key]
+  // 4. 用户客户端个人排序加权（最高优先级覆盖）
+  // 用户一旦配置了个性化排序，用户分配的槽位加分累加生效
+  if (hasUserWeights && userWeights && typeof userWeights[key] === 'number') {
+    base += userWeights[key]
   }
-
-  base += rankBonus
 
   return base
 }

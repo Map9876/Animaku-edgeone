@@ -24,7 +24,7 @@ export const HomeDesktopSplitHero = memo(function HomeDesktopSplitHero({
       <div className="w-[38.2%] aspect-[1274/884] shrink-0">
         {isLoading && items.length === 0 ? (
           <div className="kz-skeleton h-full w-full rounded-2xl" />
-        ) : isError && items.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-[var(--kz-danger)]/30 bg-[var(--kz-bg-soft)] p-6 text-center">
             <p className="text-xs font-medium text-[var(--kz-danger)]">
               推荐内容加载失败

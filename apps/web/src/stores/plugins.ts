@@ -196,6 +196,7 @@ function getSiteDefaultPluginsConfig(): {
   pluginOrder?: string[]
   pluginWeights?: Record<string, number>
   disabledPlugins?: string[]
+  pluginOldAnimePriority?: Record<string, boolean>
 } | null {
   if (typeof localStorage === 'undefined') return null
   try {
@@ -206,6 +207,7 @@ function getSiteDefaultPluginsConfig(): {
           pluginOrder?: string[]
           pluginWeights?: Record<string, number>
           disabledPlugins?: string[]
+          pluginOldAnimePriority?: Record<string, boolean>
         }
       }
       return parsed.defaultSettings || null
@@ -227,6 +229,18 @@ export function seedFromDefaultsWithSiteOverrides(): {
       ...p,
       enabled: !disabledSet.has(p.name.toLowerCase()),
     }))
+  }
+  if (d?.pluginOldAnimePriority && typeof d.pluginOldAnimePriority === 'object') {
+    plugins = plugins.map((p) => {
+      const key = p.name.toLowerCase()
+      if (typeof d.pluginOldAnimePriority![key] === 'boolean') {
+        return {
+          ...p,
+          oldAnimePriority: d.pluginOldAnimePriority![key],
+        }
+      }
+      return p
+    })
   }
   const pluginWeights =
     d?.pluginWeights && typeof d.pluginWeights === 'object' ? d.pluginWeights : {}

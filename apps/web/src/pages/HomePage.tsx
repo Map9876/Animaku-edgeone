@@ -199,12 +199,12 @@ export function HomePage() {
             <HeroCoverFlowSkeleton />
           ) : heroItems.length >= 3 ? (
             <HeroCoverFlow items={heroItems} recommendations={recommendations} limit={10} />
-          ) : dailyRecommend.isError ? (
+          ) : (
             <ErrorState
-              error={dailyRecommend.error}
+              error={dailyRecommend.error || new Error('推荐内容加载失败')}
               onRetry={() => dailyRecommend.refetch()}
             />
-          ) : null}
+          )}
         </div>
 
         {/* 桌面端 (≥ 1024px)：左侧轮播 Banner + 右侧每日更新 6 宫格矩阵 */}
@@ -213,7 +213,7 @@ export function HomePage() {
             items={heroItems}
             recommendations={recommendations}
             isLoading={dailyRecommend.isLoading && heroItems.length === 0}
-            isError={dailyRecommend.isError && heroItems.length === 0}
+            isError={dailyRecommend.isError || heroItems.length === 0}
             onRetry={() => dailyRecommend.refetch()}
           />
         </div>

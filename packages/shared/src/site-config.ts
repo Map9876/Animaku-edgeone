@@ -68,6 +68,11 @@ export interface SiteDefaultSettings {
   pluginOrder?: string[]
   disabledPlugins?: string[]
   /**
+   * 管理员配置的视频源老番优先开关覆盖（key 为源名称小写，value 为 boolean）。
+   * 未显式配置时自动回退使用出厂默认规则。
+   */
+  pluginOldAnimePriority?: Record<string, boolean>
+  /**
    * 每个视频源针对特定 Bangumi ID 的专属加权名单（key 为源名称小写，value 为 bangumiId 数组）。
    * 播放该 ID 的番剧时对应源权重增加 500。
    */

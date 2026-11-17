@@ -209,6 +209,20 @@ test('findDefaultSourcePlugin: 老番场景赋予 oldAnimePriority 插件加权 
   assert.equal(target?.name, 'anime1')
 })
 
+test('findDefaultSourcePlugin: 管理员手动覆盖老番优先开关生效', () => {
+  const mockPlugins: PluginMeta[] = [
+    { name: 'xifan-next', version: '1.0.0', weight: 70, enabled: true },
+    { name: 'cycani', version: '1.0.0', weight: 60, oldAnimePriority: false, enabled: true },
+  ]
+  // cycani 原出厂无老番优先，管理员显式开启 cycani 老番优先：
+  // cycani 获得 60 + 15 = 75 分，超过 xifan-next 70 分反超成为首选
+  const target = findDefaultSourcePlugin(mockPlugins, {
+    isOldAnime: true,
+    adminOldAnimePriority: { cycani: true },
+  })
+  assert.equal(target?.name, 'cycani')
+})
+
 test('findDefaultSourcePlugin: 用户强行置顶时优先于老番加权', () => {
   const mockPlugins: PluginMeta[] = [
     { name: 'xifan-next', version: '1.0.0', weight: 70, enabled: true },

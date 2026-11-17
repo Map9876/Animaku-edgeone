@@ -373,6 +373,12 @@ function AdminDashboard() {
     }
     return {}
   })
+  const [defPluginOldAnimePriority, setDefPluginOldAnimePriority] = useState<Record<string, boolean>>(() => {
+    if (defaultSettings?.pluginOldAnimePriority && typeof defaultSettings.pluginOldAnimePriority === 'object') {
+      return defaultSettings.pluginOldAnimePriority
+    }
+    return {}
+  })
 
   // 快捷日期切换
   const selectQuickDate = (daysAgo: number) => {
@@ -535,8 +541,14 @@ function AdminDashboard() {
       if (Array.isArray(defaultSettings.disabledPlugins)) {
         setDefDisabledPlugins(defaultSettings.disabledPlugins)
       }
+      if (defaultSettings.pluginWeights && typeof defaultSettings.pluginWeights === 'object') {
+        setDefPluginWeights(defaultSettings.pluginWeights)
+      }
       if (defaultSettings.sourceBangumiIds && typeof defaultSettings.sourceBangumiIds === 'object') {
         setDefSourceBangumiIds(defaultSettings.sourceBangumiIds)
+      }
+      if (defaultSettings.pluginOldAnimePriority && typeof defaultSettings.pluginOldAnimePriority === 'object') {
+        setDefPluginOldAnimePriority(defaultSettings.pluginOldAnimePriority)
       }
     }
   }, [defaultSettings])
@@ -586,6 +598,7 @@ function AdminDashboard() {
     weights: Record<string, number>,
     disabled: string[],
     boosted: Record<string, number[]>,
+    oldAnimePriority: Record<string, boolean> = defPluginOldAnimePriority,
   ) => {
     setPluginsSaving(true)
     setPluginsMsg('')
@@ -595,6 +608,7 @@ function AdminDashboard() {
         pluginOrder: order,
         disabledPlugins: disabled,
         sourceBangumiIds: boosted,
+        pluginOldAnimePriority: oldAnimePriority,
       })
       if (res.ok) {
         usePluginStore.getState().setPluginOrder(order)
@@ -642,12 +656,58 @@ function AdminDashboard() {
     void persistPluginsConfig(defPluginOrder, defPluginWeights, defDisabledPlugins, nextBoosted)
   }
 
-  const handleResetPlugins = async () => {
+  // 1. 仅重置视频源基准权重至官方出厂分
+  const handleResetWeightsOnly = async () => {
+    if (!confirm('确定将全站视频源的基准分值恢复为官方出厂分吗？（将保留番剧专属加权与禁用设置）')) return
+    const defaultNames = allPlugins.map((p) => p.name)
+    setDefPluginWeights({})
+    setDefPluginOrder(defaultNames)
+    setPluginsSaving(true)
+    setPluginsMsg('')
+    try {
+      await saveDefaultSettings({
+        pluginWeights: {},
+        pluginOrder: defaultNames,
+        disabledPlugins: defDisabledPlugins,
+        sourceBangumiIds: defSourceBangumiIds,
+      })
+      usePluginStore.getState().setPluginOrder(defaultNames)
+      setPluginsMsg('✅ 已重置基准分值至官方出厂分')
+    } finally {
+      setPluginsSaving(false)
+      setTimeout(() => setPluginsMsg(''), 2500)
+    }
+  }
+
+  // 2. 仅重置番剧专属加权
+  const handleResetBoostedOnly = async () => {
+    if (!confirm('确定清空全站所有视频源的番剧专属加权吗？（将保留基准分与禁用设置）')) return
+    setDefSourceBangumiIds({})
+    setPluginsSaving(true)
+    setPluginsMsg('')
+    try {
+      await saveDefaultSettings({
+        pluginWeights: defPluginWeights,
+        pluginOrder: defPluginOrder,
+        disabledPlugins: defDisabledPlugins,
+        sourceBangumiIds: {},
+      })
+      setPluginsMsg('✅ 已清空全部番剧专属加权')
+    } finally {
+      setPluginsSaving(false)
+      setTimeout(() => setPluginsMsg(''), 2500)
+    }
+  }
+
+  // 3. 全站视频源配置全部恢复出厂默认
+  const handleResetAllPlugins = async () => {
+    if (!confirm('⚠️ 确定要将全站视频源配置全部恢复出厂默认吗？（基准分值、番剧专属加权、老番优先设置、禁用状态都将重置）')) return
     const defaultNames = allPlugins.map((p) => p.name)
     setDefPluginOrder(defaultNames)
     setDefPluginWeights({})
     setDefDisabledPlugins([])
     setDefSourceBangumiIds({})
+    setDefPluginOldAnimePriority({})
     setPluginsSaving(true)
     setPluginsMsg('')
     try {
@@ -656,9 +716,10 @@ function AdminDashboard() {
         pluginOrder: defaultNames,
         disabledPlugins: [],
         sourceBangumiIds: {},
+        pluginOldAnimePriority: {},
       })
       usePluginStore.getState().setPluginOrder(defaultNames)
-      setPluginsMsg('✅ 已恢复官方默认并自动保存')
+      setPluginsMsg('✅ 全站视频源配置已全部恢复出厂默认')
     } finally {
       setPluginsSaving(false)
       setTimeout(() => setPluginsMsg(''), 2500)
@@ -1049,26 +1110,51 @@ function AdminDashboard() {
   // 视频源排序辅助：纯有效权重排序
   const sortedDefaultPlugins = useMemo(() => {
     return [...allPlugins].sort((a, b) =>
-      comparePluginOrder(a, b, { adminWeights: defPluginWeights }),
+      comparePluginOrder(a, b, {
+        adminWeights: defPluginWeights,
+        adminOldAnimePriority: defPluginOldAnimePriority,
+      }),
     )
-  }, [allPlugins, defPluginWeights])
+  }, [allPlugins, defPluginWeights, defPluginOldAnimePriority])
 
-  const movePluginOrder = (name: string, dir: -1 | 1) => {
-    const names = sortedDefaultPlugins.map((p) => p.name)
-    const idx = names.findIndex((n) => n.toLowerCase() === name.toLowerCase())
-    if (idx < 0) return
-    const target = idx + dir
-    if (target < 0 || target >= names.length) return
-    ;[names[idx], names[target]] = [names[target], names[idx]]
-    const weights: Record<string, number> = {}
-    const step = 1000
-    const total = names.length
-    names.forEach((n, i) => {
-      weights[n.toLowerCase()] = (total - i) * step
-    })
-    setDefPluginWeights(weights)
-    setDefPluginOrder(names)
-    void persistPluginsConfig(names, weights, defDisabledPlugins, defSourceBangumiIds)
+  // 切换单个源的老番优先状态
+  const togglePluginOldAnimePriority = (name: string, currentState: boolean) => {
+    const key = name.toLowerCase()
+    const nextPriority = { ...defPluginOldAnimePriority, [key]: !currentState }
+    setDefPluginOldAnimePriority(nextPriority)
+    void persistPluginsConfig(
+      defPluginOrder,
+      defPluginWeights,
+      defDisabledPlugins,
+      defSourceBangumiIds,
+      nextPriority,
+    )
+  }
+
+  // 调整单个源的基准分数（0~999，推荐 0~100 标准分制）
+  const handleUpdatePluginWeight = (name: string, newScore: number) => {
+    const key = name.toLowerCase()
+    const clamped = Math.max(0, Math.min(999, Math.round(newScore)))
+    const nextWeights = { ...defPluginWeights, [key]: clamped }
+    setDefPluginWeights(nextWeights)
+    const nextOrder = [...allPlugins]
+      .sort((a, b) => comparePluginOrder(a, b, { adminWeights: nextWeights }))
+      .map((p) => p.name)
+    setDefPluginOrder(nextOrder)
+    void persistPluginsConfig(nextOrder, nextWeights, defDisabledPlugins, defSourceBangumiIds)
+  }
+
+  // 恢复单个源至官方出厂分值
+  const handleResetSinglePluginWeight = (name: string) => {
+    const key = name.toLowerCase()
+    const nextWeights = { ...defPluginWeights }
+    delete nextWeights[key]
+    setDefPluginWeights(nextWeights)
+    const nextOrder = [...allPlugins]
+      .sort((a, b) => comparePluginOrder(a, b, { adminWeights: nextWeights }))
+      .map((p) => p.name)
+    setDefPluginOrder(nextOrder)
+    void persistPluginsConfig(nextOrder, nextWeights, defDisabledPlugins, defSourceBangumiIds)
   }
 
   const togglePluginDisabledState = (name: string) => {
@@ -1486,13 +1572,13 @@ function AdminDashboard() {
                       className="hidden"
                     />
                   </label>
-                  <button
-                    type="button"
+                  <KzButton
+                    size="sm"
+                    variant="secondary"
                     onClick={handleResetIcon}
-                    className="inline-flex items-center gap-1 rounded-xl border border-[var(--kz-border)] bg-[var(--kz-bg)] px-2.5 py-1.5 text-xs text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)] hover:bg-[var(--kz-bg-hover)] cursor-pointer"
                   >
                     恢复官方默认图标
-                  </button>
+                  </KzButton>
                 </div>
                 <p className="text-[11px] text-[var(--kz-fg-dim)]">
                   支持 ICO / PNG / JPG / WEBP，上传后自动弹出正方形裁切器，并生成多尺寸标准 Web 图标套件。
@@ -1506,14 +1592,15 @@ function AdminDashboard() {
           )}
 
           <div className="flex justify-end pt-1">
-            <button
-              type="button"
+            <KzButton
+              size="sm"
+              variant="primary"
               onClick={handleSaveSiteInfo}
               disabled={isSiteInfoSaving}
-              className="rounded-xl bg-[var(--kz-accent)] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[var(--kz-accent-hover)] active:scale-95 disabled:opacity-50 cursor-pointer"
+              loading={isSiteInfoSaving}
             >
-              {isSiteInfoSaving ? '保存中…' : '保存站点信息'}
-            </button>
+              保存站点信息
+            </KzButton>
           </div>
         </div>
       </AdminCard>
@@ -1548,8 +1635,9 @@ function AdminDashboard() {
                 {annEnabledInput ? '弹窗已开启' : '弹窗已停用'}
               </span>
             </div>
-            <button
-              type="button"
+            <KzButton
+              size="sm"
+              variant="outline"
               onClick={() => {
                 setPreviewAnnouncement({
                   id: 'preview',
@@ -1566,10 +1654,9 @@ function AdminDashboard() {
                   updatedAt: Date.now(),
                 })
               }}
-              className="rounded-lg border border-[var(--kz-border)] bg-[var(--kz-bg)] px-2.5 py-1 text-xs text-[var(--kz-fg)] hover:bg-[var(--kz-bg-hover)] cursor-pointer"
             >
               👁️ 预览弹窗效果
-            </button>
+            </KzButton>
           </div>
 
           <div className="space-y-1">
@@ -1593,18 +1680,14 @@ function AdminDashboard() {
                   { key: 'large', label: '宽屏海报 (560px)' },
                 ] as const
               ).map((opt) => (
-                <button
+                <KzButton
                   key={opt.key}
-                  type="button"
+                  size="xs"
+                  variant={annSizeInput === opt.key ? 'primary' : 'secondary'}
                   onClick={() => setAnnSizeInput(opt.key)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors cursor-pointer ${
-                    annSizeInput === opt.key
-                      ? 'border-[var(--kz-accent)] bg-[var(--kz-accent)]/10 text-[var(--kz-accent)] font-semibold'
-                      : 'border-[var(--kz-border)] bg-[var(--kz-bg)] text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)]'
-                  }`}
                 >
                   {opt.label}
-                </button>
+                </KzButton>
               ))}
             </div>
           </div>
@@ -1682,14 +1765,15 @@ function AdminDashboard() {
               </label>
 
               {/* 保存按钮 */}
-              <button
-                type="button"
+              <KzButton
+                size="sm"
+                variant="primary"
                 onClick={handleSaveAnnouncement}
                 disabled={annSaving}
-                className="rounded-xl bg-[var(--kz-accent)] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[var(--kz-accent-hover)] active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
+                loading={annSaving}
               >
-                {annSaving ? '保存中…' : '保存'}
-              </button>
+                保存
+              </KzButton>
             </div>
           </div>
 
@@ -1709,8 +1793,9 @@ function AdminDashboard() {
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
+                      <KzButton
+                        size="xs"
+                        variant="ghost"
                         onClick={() => {
                           setAnnTitleInput(item.title || '')
                           setAnnContentInput(item.content || '')
@@ -1723,17 +1808,18 @@ function AdminDashboard() {
                           setAnnOffsetYInput(item.imageOffsetY || 50)
                           setAnnZoomInput(item.imageZoom || 1)
                         }}
-                        className="text-[11px] text-[var(--kz-accent)] hover:underline cursor-pointer"
+                        className="text-[var(--kz-accent)]"
                       >
                         还原载入
-                      </button>
-                      <button
-                        type="button"
+                      </KzButton>
+                      <KzButton
+                        size="xs"
+                        variant="ghost"
                         onClick={() => handleDeleteHistory(item.id)}
-                        className="text-[11px] text-rose-400 hover:underline cursor-pointer"
+                        className="text-rose-400 hover:text-rose-500 hover:bg-rose-500/10"
                       >
                         删除
-                      </button>
+                      </KzButton>
                     </div>
                   </div>
                 ))}
@@ -1777,14 +1863,14 @@ function AdminDashboard() {
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-[var(--kz-border)]/40">
-            <button
-              type="button"
+            <KzButton
+              size="xs"
+              variant="ghost"
               onClick={handleResetImageHost}
               disabled={imgSaving}
-              className="text-xs text-[var(--kz-fg-dim)] hover:text-[var(--kz-fg)] underline cursor-pointer"
             >
               恢复默认
-            </button>
+            </KzButton>
             <div className="text-xs">
               {imgSaving && <span className="text-[var(--kz-fg-muted)]">保存中…</span>}
               {imgMsg && <span className="text-[var(--kz-accent)]">{imgMsg}</span>}
@@ -1804,9 +1890,10 @@ function AdminDashboard() {
       >
         <div className="space-y-3">
           <p className="text-xs text-[var(--kz-fg-muted)] leading-relaxed">
-            设定全站新访客加载的默认视频源排序与启用状态。排在第 1 位的源将作为新访客打开播放页时的
+            设定全站新访客加载的默认视频源优先级。最终分值最高者将作为新访客的
             <strong className="text-[var(--kz-accent)]"> 全局默认视频源</strong>。
-            同时支持为每个视频源添加专属加权的番剧（Bangumi ID），播放对应番剧时权重自动 <strong className="text-amber-400">+500</strong>。
+            支持直接输入基准分或按 +/- 微调（建议 0~100 标准分制）。经典老番场景下启用了「老番优先」的源会自动获得 <strong className="text-amber-400">+15</strong> 分加权。
+            同时支持为视频源绑定专属番剧 ID（播放该番时权重自动 <strong className="text-amber-400">+500</strong>）。
           </p>
 
           <div className="space-y-2">
@@ -1816,6 +1903,22 @@ function AdminDashboard() {
               )
               const isDefaultTop = index === 0
               const pluginKey = plugin.name.toLowerCase()
+              const customWeight =
+                typeof defPluginWeights[pluginKey] === 'number'
+                  ? defPluginWeights[pluginKey]
+                  : undefined
+              const seedWeight =
+                typeof plugin.weight === 'number'
+                  ? plugin.weight
+                  : plugin.source === 'builtin'
+                    ? 50
+                    : 0
+              const currentScore = customWeight !== undefined ? customWeight : seedWeight
+              const isCustomized = customWeight !== undefined
+              const isOldAnimeActive =
+                typeof defPluginOldAnimePriority[pluginKey] === 'boolean'
+                  ? defPluginOldAnimePriority[pluginKey]
+                  : Boolean(plugin.oldAnimePriority)
               const boostedIds = defSourceBangumiIds[pluginKey] || []
               const isExpanded = Boolean(expandedPluginWeights[plugin.name])
 
@@ -1828,10 +1931,10 @@ function AdminDashboard() {
                       : 'border-[var(--kz-border)] bg-[var(--kz-bg)]'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                       <span
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                        className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                           isDefaultTop
                             ? 'bg-[var(--kz-accent)] text-white shadow-sm'
                             : 'bg-[var(--kz-bg-soft)] text-[var(--kz-fg-muted)]'
@@ -1847,74 +1950,126 @@ function AdminDashboard() {
                         {plugin.name}
                       </span>
                       {renderPluginBadge(plugin)}
-                      {plugin.oldAnimePriority && (
-                        <span
-                          className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-medium text-amber-500 border border-amber-500/20"
-                          title="经典老番场景自动 +15 权重优先"
-                        >
-                          老番优先
-                        </span>
-                      )}
                       {isDefaultTop && (
                         <span className="rounded bg-[var(--kz-accent)]/20 px-1.5 py-0.5 text-[9px] font-bold text-[var(--kz-accent)]">
-                          默认首选源
+                          首选源
                         </span>
                       )}
-                      <span className="rounded bg-[var(--kz-bg-soft)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--kz-fg-dim)] border border-[var(--kz-border-subtle)]" title="站点当前设定的有效基准权重">
-                        基准分: {getPluginTotalWeight(plugin, { adminWeights: defPluginWeights })}
+                      <span
+                        className="rounded bg-[var(--kz-bg-soft)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--kz-fg-dim)] border border-[var(--kz-border-subtle)]"
+                        title="当前站点生效的最终基准分"
+                      >
+                        分值: {getPluginTotalWeight(plugin, { adminWeights: defPluginWeights, adminOldAnimePriority: defPluginOldAnimePriority })}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                      {/* 基准分输入与步进调分控制器（像素级对齐一体式 Stepper） */}
+                      <div className="inline-flex items-center gap-1.5 shrink-0">
+                        <span className="text-xs font-medium text-[var(--kz-fg-muted)] select-none">
+                          基准
+                        </span>
+                        <div className="inline-flex h-6 items-stretch rounded-lg border border-[var(--kz-border)] bg-[var(--kz-bg)] overflow-hidden shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdatePluginWeight(plugin.name, currentScore - 5)}
+                            disabled={currentScore <= 0}
+                            className="flex w-5.5 items-center justify-center bg-[var(--kz-bg-soft)] hover:bg-[var(--kz-bg-hover)] active:bg-[var(--kz-bg)] disabled:opacity-30 disabled:pointer-events-none text-xs font-bold text-[var(--kz-fg)] transition-colors cursor-pointer select-none border-r border-[var(--kz-border)]"
+                            title="分值 -5"
+                          >
+                            <span className="flex items-center justify-center leading-none text-xs">−</span>
+                          </button>
+                          <input
+                            type="number"
+                            min={0}
+                            max={999}
+                            value={currentScore}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value, 10)
+                              if (Number.isFinite(val)) {
+                                handleUpdatePluginWeight(plugin.name, val)
+                              }
+                            }}
+                            className="w-9 bg-[var(--kz-bg)] text-center font-mono text-xs font-semibold text-[var(--kz-fg)] outline-none focus:bg-[var(--kz-bg-elevated)] p-0 m-0 border-0 leading-6 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            title="直接输入基准分 (0~999)"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleUpdatePluginWeight(plugin.name, currentScore + 5)}
+                            className="flex w-5.5 items-center justify-center bg-[var(--kz-bg-soft)] hover:bg-[var(--kz-bg-hover)] active:bg-[var(--kz-bg)] text-xs font-bold text-[var(--kz-fg)] transition-colors cursor-pointer select-none border-l border-[var(--kz-border)]"
+                            title="分值 +5"
+                          >
+                            <span className="flex items-center justify-center leading-none text-xs">+</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 若被管理员自定义过分值，提供单源出厂分恢复 */}
+                      {isCustomized && (
+                        <KzButton
+                          size="xs"
+                          variant="outline"
+                          onClick={() => handleResetSinglePluginWeight(plugin.name)}
+                          className="border-dashed border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+                          title={`恢复官方出厂分值 (${seedWeight})`}
+                        >
+                          出厂 {seedWeight}
+                        </KzButton>
+                      )}
+
+                      {/* 老番优先自定义开关按钮（统一采用系统 KzButton 组件） */}
+                      <KzButton
+                        size="xs"
+                        variant="secondary"
+                        onClick={() => togglePluginOldAnimePriority(plugin.name, isOldAnimeActive)}
+                        className={
+                          isOldAnimeActive
+                            ? 'border-amber-500/50 bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 font-medium'
+                            : 'text-[var(--kz-fg-muted)]'
+                        }
+                        title={
+                          isOldAnimeActive
+                            ? '老番优先：已开启 (+15 分，点击关闭)'
+                            : '老番优先：未开启 (点击开启老番场景自动 +15 分)'
+                        }
+                      >
+                        老番优先
+                      </KzButton>
+
+                      {/* 番剧加权按钮（统一采用系统 KzButton 组件） */}
+                      <KzButton
+                        size="xs"
+                        variant="secondary"
                         onClick={() =>
                           setExpandedPluginWeights((prev) => ({
                             ...prev,
                             [plugin.name]: !prev[plugin.name],
                           }))
                         }
-                        className={`rounded-lg px-2 py-1 text-[11px] font-medium border transition-colors cursor-pointer ${
+                        className={
                           boostedIds.length > 0
-                            ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
-                            : 'border-[var(--kz-border)] bg-[var(--kz-bg-soft)] text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)]'
-                        }`}
+                            ? 'border-amber-500/50 bg-amber-500/15 text-amber-500 hover:bg-amber-500/25 font-medium'
+                            : 'text-[var(--kz-fg-muted)]'
+                        }
                         title="配置播放特定番剧时该源增加权重 500"
                       >
-                        🎯 番剧加权{boostedIds.length > 0 ? ` (${boostedIds.length})` : ''}
-                      </button>
+                        加权{boostedIds.length > 0 ? ` (${boostedIds.length})` : ''}
+                      </KzButton>
 
-                      <button
-                        type="button"
+                      {/* 启用/禁用按钮（统一采用系统 KzButton 组件） */}
+                      <KzButton
+                        size="xs"
+                        variant={isDisabled ? 'danger-outline' : 'secondary'}
                         onClick={() => togglePluginDisabledState(plugin.name)}
-                        className={`rounded-lg px-2 py-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                        className={
                           isDisabled
-                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        }`}
+                            ? ''
+                            : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 font-medium'
+                        }
                         title={isDisabled ? '已全局禁用，点击启用' : '正常启用，点击禁用'}
                       >
                         {isDisabled ? '已禁用' : '已启用'}
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={index === 0}
-                        onClick={() => movePluginOrder(plugin.name, -1)}
-                        className="rounded-lg border border-[var(--kz-border)] bg-[var(--kz-bg-soft)] p-1 text-xs text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)] disabled:opacity-30 cursor-pointer"
-                        title="上移"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        disabled={index === sortedDefaultPlugins.length - 1}
-                        onClick={() => movePluginOrder(plugin.name, 1)}
-                        className="rounded-lg border border-[var(--kz-border)] bg-[var(--kz-bg-soft)] p-1 text-xs text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)] disabled:opacity-30 cursor-pointer"
-                        title="下移"
-                      >
-                        ▼
-                      </button>
+                      </KzButton>
                     </div>
                   </div>
 
@@ -1944,13 +2099,13 @@ function AdminDashboard() {
                           placeholder="输入 Bangumi ID，如 253，多个用逗号隔开"
                           className="flex-1 rounded-lg border border-[var(--kz-border)] bg-[var(--kz-bg-soft)] px-2.5 py-1 text-xs text-[var(--kz-fg)] outline-none focus:border-[var(--kz-accent)]"
                         />
-                        <button
-                          type="button"
+                        <KzButton
+                          size="xs"
+                          variant="primary"
                           onClick={() => handleAddBangumiIds(plugin.name)}
-                          className="shrink-0 rounded-lg bg-[var(--kz-accent)] px-3 py-1 text-xs font-semibold text-white hover:bg-[var(--kz-accent-hover)] cursor-pointer"
                         >
                           添加
-                        </button>
+                        </KzButton>
                       </div>
 
                       {boostedIds.length > 0 ? (
@@ -1961,14 +2116,15 @@ function AdminDashboard() {
                               className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-mono text-amber-400"
                             >
                               ID: {bgmId}
-                              <button
-                                type="button"
+                              <KzButton
+                                size="xs"
+                                variant="ghost"
                                 onClick={() => handleRemoveBangumiId(plugin.name, bgmId)}
-                                className="hover:text-rose-400 cursor-pointer ml-0.5"
+                                className="!h-3.5 !w-3.5 !min-w-3.5 !p-0 text-[10px] text-amber-400/80 hover:text-rose-400 hover:bg-rose-500/10 ml-0.5 leading-none"
                                 title="移除此 ID"
                               >
                                 ✕
-                              </button>
+                              </KzButton>
                             </span>
                           ))}
                         </div>
@@ -1982,15 +2138,37 @@ function AdminDashboard() {
             })}
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-[var(--kz-border)]/40">
-            <button
-              type="button"
-              onClick={handleResetPlugins}
-              disabled={pluginsSaving}
-              className="text-xs text-[var(--kz-fg-dim)] hover:text-[var(--kz-fg)] underline cursor-pointer"
-            >
-              恢复默认
-            </button>
+          {/* 底部细粒度回退与重置操作栏 */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-[var(--kz-border)]/40">
+            <div className="flex flex-wrap items-center gap-2">
+              <KzButton
+                size="sm"
+                variant="secondary"
+                onClick={handleResetWeightsOnly}
+                disabled={pluginsSaving}
+                title="清空所有自定义基准分值，恢复为官方出厂分（保留番剧专属加权与禁用状态）"
+              >
+                ↺ 仅重置分值
+              </KzButton>
+              <KzButton
+                size="sm"
+                variant="secondary"
+                onClick={handleResetBoostedOnly}
+                disabled={pluginsSaving}
+                title="清空所有源配置的专属番剧加权 Bangumi ID（保留基准分与禁用状态）"
+              >
+                ↺ 仅重置番剧加权
+              </KzButton>
+              <KzButton
+                size="sm"
+                variant="danger-outline"
+                onClick={handleResetAllPlugins}
+                disabled={pluginsSaving}
+                title="全量重置：分值、番剧专属加权、禁用状态全部恢复为官方初始状态"
+              >
+                ⚠️ 全部恢复默认
+              </KzButton>
+            </div>
             <div className="text-xs">
               {pluginsSaving && <span className="text-[var(--kz-fg-muted)]">保存中…</span>}
               {pluginsMsg && <span className="text-[var(--kz-accent)]">{pluginsMsg}</span>}
@@ -2070,14 +2248,14 @@ function AdminDashboard() {
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-[var(--kz-border)]/40">
-            <button
-              type="button"
+            <KzButton
+              size="xs"
+              variant="ghost"
               onClick={handleResetPlayer}
               disabled={playerSaving}
-              className="text-xs text-[var(--kz-fg-dim)] hover:text-[var(--kz-fg)] underline cursor-pointer"
             >
               恢复默认
-            </button>
+            </KzButton>
             <div className="text-xs">
               {playerSaving && <span className="text-[var(--kz-fg-muted)]">保存中…</span>}
               {playerMsg && <span className="text-[var(--kz-accent)]">{playerMsg}</span>}
@@ -2170,22 +2348,23 @@ function AdminDashboard() {
           {danmakuMsg && <div className="text-xs text-[var(--kz-accent)] pt-1">{danmakuMsg}</div>}
 
           <div className="flex items-center justify-between pt-2 border-t border-[var(--kz-border)]/40">
-            <button
-              type="button"
+            <KzButton
+              size="xs"
+              variant="ghost"
               onClick={handleResetDanmaku}
               disabled={danmakuSaving}
-              className="text-xs text-[var(--kz-fg-dim)] hover:text-[var(--kz-fg)] underline cursor-pointer"
             >
               恢复默认
-            </button>
-            <button
-              type="button"
+            </KzButton>
+            <KzButton
+              size="sm"
+              variant="primary"
               onClick={handleSaveDanmaku}
               disabled={danmakuSaving}
-              className="rounded-xl bg-[var(--kz-accent)] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[var(--kz-accent-hover)] active:scale-95 disabled:opacity-50 cursor-pointer"
+              loading={danmakuSaving}
             >
-              {danmakuSaving ? '保存中…' : '保存'}
-            </button>
+              保存
+            </KzButton>
           </div>
         </div>
       </AdminCard>
@@ -2211,14 +2390,14 @@ function AdminDashboard() {
               新标签页安全跳转，防劫持且符合 SEO 规范。
             </p>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
+              <KzButton
+                size="sm"
+                variant="primary"
                 onClick={handleOpenAddLink}
-                className="inline-flex items-center gap-1 rounded-xl bg-[var(--kz-accent)] px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[var(--kz-accent-hover)] active:scale-95 transition-all cursor-pointer"
               >
                 <span>➕</span>
                 <span>添加外链广告位</span>
-              </button>
+              </KzButton>
             </div>
           </div>
 
@@ -2227,13 +2406,13 @@ function AdminDashboard() {
             <div className="rounded-2xl border border-[var(--kz-accent)]/30 bg-[var(--kz-bg)] p-4 space-y-3 shadow-md animate-in fade-in duration-200">
               <div className="flex items-center justify-between border-b border-[var(--kz-border)] pb-2 text-xs font-bold text-[var(--kz-fg)]">
                 <span>{editingLinkId ? '✏️ 编辑外链' : '➕ 新增广告外链'}</span>
-                <button
-                  type="button"
+                <KzButton
+                  size="xs"
+                  variant="ghost"
                   onClick={handleCancelLinkForm}
-                  className="text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)] cursor-pointer"
                 >
                   ✕ 关闭
-                </button>
+                </KzButton>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -2270,23 +2449,25 @@ function AdminDashboard() {
                     </label>
                     <div className="flex items-center gap-1 text-[10px]">
                       {['HOT', 'AD', '福利', '推荐'].map((tag) => (
-                        <button
+                        <KzButton
                           key={tag}
-                          type="button"
+                          size="xs"
+                          variant="secondary"
                           onClick={() => setLinkForm({ ...linkForm, badge: tag })}
-                          className="rounded px-1.5 py-0.5 border border-[var(--kz-border)] bg-[var(--kz-bg-soft)] text-[var(--kz-fg-muted)] hover:text-[var(--kz-accent)] hover:border-[var(--kz-accent)] cursor-pointer"
+                          className="!px-1.5 !h-5 !text-[10px]"
                         >
                           {tag}
-                        </button>
+                        </KzButton>
                       ))}
                       {linkForm.badge && (
-                        <button
-                          type="button"
+                        <KzButton
+                          size="xs"
+                          variant="ghost"
                           onClick={() => setLinkForm({ ...linkForm, badge: '' })}
-                          className="text-[var(--kz-fg-dim)] hover:text-rose-400 ml-1 cursor-pointer"
+                          className="!px-1 !h-5 text-[var(--kz-fg-dim)] hover:text-rose-400"
                         >
                           清空
-                        </button>
+                        </KzButton>
                       )}
                     </div>
                   </div>
@@ -2338,21 +2519,22 @@ function AdminDashboard() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
+                  <KzButton
+                    size="sm"
+                    variant="secondary"
                     onClick={handleCancelLinkForm}
-                    className="rounded-xl border border-[var(--kz-border)] px-3 py-1.5 text-xs font-semibold text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)] cursor-pointer"
                   >
                     取消
-                  </button>
-                  <button
-                    type="button"
+                  </KzButton>
+                  <KzButton
+                    size="sm"
+                    variant="primary"
                     disabled={navLinksSaving}
+                    loading={navLinksSaving}
                     onClick={handleSaveLinkForm}
-                    className="rounded-xl bg-[var(--kz-accent)] px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[var(--kz-accent-hover)] cursor-pointer disabled:opacity-50"
                   >
-                    {navLinksSaving ? '保存中…' : editingLinkId ? '保存修改' : '添加并保存'}
-                  </button>
+                    {editingLinkId ? '保存修改' : '添加并保存'}
+                  </KzButton>
                 </div>
               </div>
             </div>
@@ -2375,24 +2557,26 @@ function AdminDashboard() {
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     {/* 排序按钮 */}
                     <div className="flex flex-col gap-0.5 shrink-0">
-                      <button
-                        type="button"
+                      <KzButton
+                        size="xs"
+                        variant="ghost"
                         disabled={idx === 0}
                         onClick={() => handleMoveNavLink(idx, 'up')}
-                        className="rounded p-0.5 text-[10px] text-[var(--kz-fg-muted)] hover:bg-[var(--kz-bg-hover)] hover:text-[var(--kz-fg)] disabled:opacity-20 cursor-pointer"
+                        className="!h-4.5 !w-5 !min-w-5 !p-0 text-[10px] leading-none"
                         title="上移"
                       >
                         ▲
-                      </button>
-                      <button
-                        type="button"
+                      </KzButton>
+                      <KzButton
+                        size="xs"
+                        variant="ghost"
                         disabled={idx === adminNavLinks.length - 1}
                         onClick={() => handleMoveNavLink(idx, 'down')}
-                        className="rounded p-0.5 text-[10px] text-[var(--kz-fg-muted)] hover:bg-[var(--kz-bg-hover)] hover:text-[var(--kz-fg)] disabled:opacity-20 cursor-pointer"
+                        className="!h-4.5 !w-5 !min-w-5 !p-0 text-[10px] leading-none"
                         title="下移"
                       >
                         ▼
-                      </button>
+                      </KzButton>
                     </div>
 
                     <div className="min-w-0 flex-1">
@@ -2421,33 +2605,36 @@ function AdminDashboard() {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
+                    <KzButton
+                      size="xs"
+                      variant={link.enabled ? 'secondary' : 'outline'}
                       onClick={() => handleToggleNavLink(link.id)}
-                      className={`rounded-lg px-2 py-1 text-xs font-semibold cursor-pointer transition-all ${
+                      className={
                         link.enabled
-                          ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                          : 'border border-[var(--kz-border)] bg-[var(--kz-bg-elevated)] text-[var(--kz-fg-muted)]'
-                      }`}
+                          ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-medium'
+                          : 'text-[var(--kz-fg-muted)]'
+                      }
                     >
                       {link.enabled ? '✓ 已启用' : '⚪ 已停用'}
-                    </button>
-                    <button
-                      type="button"
+                    </KzButton>
+                    <KzButton
+                      size="xs"
+                      variant="secondary"
                       onClick={() => handleEditLink(link)}
-                      className="rounded-lg border border-[var(--kz-border)] bg-[var(--kz-bg-elevated)] p-1.5 text-xs text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)] hover:border-[var(--kz-accent)] transition-all cursor-pointer"
+                      className="!h-6 !w-6 !min-w-6 !p-0"
                       title="编辑"
                     >
                       ✏️
-                    </button>
-                    <button
-                      type="button"
+                    </KzButton>
+                    <KzButton
+                      size="xs"
+                      variant="danger-outline"
                       onClick={() => handleDeleteNavLink(link.id)}
-                      className="rounded-lg border border-[var(--kz-border)] bg-[var(--kz-bg-elevated)] p-1.5 text-xs text-rose-400 hover:border-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer"
+                      className="!h-6 !w-6 !min-w-6 !p-0"
                       title="删除"
                     >
                       🗑️
-                    </button>
+                    </KzButton>
                   </div>
                 </div>
               ))}
@@ -2545,14 +2732,14 @@ function AdminDashboard() {
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-[var(--kz-border)]/40">
-            <button
-              type="button"
+            <KzButton
+              size="xs"
+              variant="ghost"
               onClick={handleResetNav}
               disabled={navSaving}
-              className="text-xs text-[var(--kz-fg-dim)] hover:text-[var(--kz-fg)] underline cursor-pointer"
             >
               恢复默认
-            </button>
+            </KzButton>
             <div className="text-xs">
               {navSaving && <span className="text-[var(--kz-fg-muted)]">保存中…</span>}
               {navMsg && <span className="text-[var(--kz-accent)]">{navMsg}</span>}
@@ -2576,14 +2763,15 @@ function AdminDashboard() {
             等全球搜索引擎提交全站所有静态页与番剧条目 URL，加速新收录与更新。
           </p>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
+            <KzButton
+              size="sm"
+              variant="secondary"
               onClick={handleTriggerIndexNow}
               disabled={isIndexing}
-              className="rounded-xl border border-[var(--kz-border)] bg-[var(--kz-bg)] px-3.5 py-2 text-xs font-semibold text-[var(--kz-fg)] hover:bg-[var(--kz-bg-hover)] active:scale-95 disabled:opacity-50 cursor-pointer"
+              loading={isIndexing}
             >
-              {isIndexing ? '推送中…' : '🚀 立即推送全站 URL'}
-            </button>
+              🚀 立即推送全站 URL
+            </KzButton>
             {indexMsg && <span className="text-xs">{indexMsg}</span>}
           </div>
         </div>
@@ -2602,14 +2790,15 @@ function AdminDashboard() {
           <p className="text-xs text-rose-400 leading-relaxed">
             将服务端保存的站点名称、标语、自定义图标、全站公告及所有全局默认配置彻底清除，恢复为代码出厂默认值。
           </p>
-          <button
-            type="button"
+          <KzButton
+            size="sm"
+            variant="danger-outline"
             onClick={handleResetAll}
             disabled={isResettingAll}
-            className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 active:scale-95 disabled:opacity-50 cursor-pointer"
+            loading={isResettingAll}
           >
-            {isResettingAll ? '重置中…' : '全局恢复官方出厂默认 (Reset All)'}
-          </button>
+            全局恢复官方出厂默认 (Reset All)
+          </KzButton>
         </div>
       </AdminCard>
 

@@ -109,7 +109,14 @@ function readDiskCacheSync(key: string): RecommendItem[] | undefined {
     const raw = localStorage.getItem(key)
     if (!raw) return undefined
     const parsed = JSON.parse(raw)
-    if (!parsed || !parsed.expiresAt || Date.now() > parsed.expiresAt) {
+    if (
+      !parsed ||
+      !parsed.expiresAt ||
+      Date.now() > parsed.expiresAt ||
+      !Array.isArray(parsed.data) ||
+      parsed.data.length === 0
+    ) {
+      // 若缓存过期或存入了空数组脏数据，主动清除并拒绝作为有效 initialData
       localStorage.removeItem(key)
       return undefined
     }
@@ -128,7 +135,7 @@ const diskCacheAdapter = {
   },
 
   set: async (key: string, data: RecommendItem[], maxAgeMs: number): Promise<void> => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || !Array.isArray(data) || data.length === 0) return
     try {
       const payload = {
         data,
