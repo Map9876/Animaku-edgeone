@@ -61,7 +61,8 @@ services:
       PLUGIN_SHOP: ${PLUGIN_SHOP:-}
       PLUGIN_SHOP_MIRROR: ${PLUGIN_SHOP_MIRROR:-}
 
-      # 日志格式（pretty 高可读彩显 / json 结构化日志）
+      # 日志过滤级别 (debug / info / warn / error / silent) 与格式 (pretty / json)
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       LOG_FORMAT: ${LOG_FORMAT:-pretty}
 
       # 搜索引擎即时推送 (IndexNow) 与管理员密钥（如需使用后台管理功能必须配置，未配置时管理接口完全禁用）
