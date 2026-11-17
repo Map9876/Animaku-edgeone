@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { AdBlockerMode, PluginMeta, PluginRule } from '@animaku/shared'
-import { parsePluginRule, comparePluginOrder, isAnxRule } from '@animaku/shared'
+import type { AdBlockerMode, PluginMeta, PluginRule, WeightContext } from '@animaku/shared'
+import { parsePluginRule, comparePluginOrder, getPluginTotalWeight, isAnxRule } from '@animaku/shared'
 import { DEFAULT_PLUGIN_RULES } from '../data/default-plugins'
 import { migrateLocalStorageKey } from '../lib/storage'
 
@@ -50,13 +50,16 @@ migrateLocalStorageKey('animaku-plugins', [
 /** v44: add huazi (huazidm.com) built-in with weight 58 (same as akianime) */
 /** v45: add jzacg (jzacg.com) built-in with weight 58 */
 /** v46: disable tvtfun by default due to upstream turnstile captcha */
-export const PLUGIN_DEFAULTS_VERSION = 46
+/** v47: refactor plugin sorting to unified score weight model */
+export const PLUGIN_DEFAULTS_VERSION = 47
 
 interface PluginState {
   plugins: PluginMeta[]
   /** version of built-in defaults last applied (0 = never / legacy empty) */
   defaultsVersion: number
-  /** User-defined display order of plugin names (first = default source). */
+  /** User-defined weight offsets for plugins (key is lowercase plugin name). */
+  userPluginWeights: Record<string, number>
+  /** User-defined display order of plugin names for backwards compatibility. */
   pluginOrder: string[]
   importRule: (
     raw: unknown,
@@ -68,10 +71,18 @@ interface PluginState {
   setPluginAdBlockerMode: (id: string, adBlockerMode: AdBlockerMode) => void
   /** Per-rule media proxy toggle */
   setPluginProxy: (id: string, proxy: boolean) => void
-  /** Reorder plugins by name list (first = top, becomes default). */
+  /** Set individual plugin user weight offset */
+  setPluginWeight: (name: string, weight: number) => void
+  /** Reorder plugins by assigned list: assigns descending weight offsets in steps of 1000 */
+  reorderPlugins: (orderedNames: string[]) => void
+  /** Pin a plugin to the absolute top position */
+  pinPluginToTop: (name: string) => void
+  /** Reset user weights back to site/official defaults */
+  resetWeightsToDefault: () => void
+  /** Compatibility alias: reorder plugins */
   setPluginOrder: (order: string[]) => void
-  /** Get enabled plugins sorted by user order (or alphabetical fallback). */
-  getEnabled: () => PluginMeta[]
+  /** Get enabled plugins sorted by total score */
+  getEnabled: (ctx?: WeightContext) => PluginMeta[]
   getByName: (name: string) => PluginMeta | undefined
   /** If store is empty, write built-in rules (safe to call often) */
   ensureDefaults: () => void
@@ -165,81 +176,49 @@ function normalizePlugins(raw: unknown): PluginMeta[] {
   )
 }
 
-/**
- * 将不在 order 中的插件按其自身权重 (comparePluginOrder) 智能合并到现有排序列表中。
- * 避免因历史快照缺少新源而将其盲目丢到最末尾。
- */
 export function mergeOrderWithNewPlugins(
   order: string[],
   allPlugins: PluginMeta[],
 ): string[] {
-  if (!order.length) return []
-  const orderSet = new Set(order.map((n) => n.toLowerCase()))
-  const missing = allPlugins.filter(
-    (p) => !orderSet.has(p.name.toLowerCase()) && Boolean(p.name),
-  )
-  if (!missing.length) return order
-
-  const sortedMissing = [...missing].sort(comparePluginOrder)
-  const result = [...order]
-
-  for (const m of sortedMissing) {
-    // 寻找在 result 中首个有效权重低于当前新源的项，插入其前方
-    let insertIdx = result.length
-    for (let i = 0; i < result.length; i++) {
-      const targetPlugin = allPlugins.find(
-        (p) => p.name.toLowerCase() === result[i].toLowerCase(),
-      )
-      if (targetPlugin && comparePluginOrder(m, targetPlugin) < 0) {
-        insertIdx = i
-        break
-      }
-    }
-    result.splice(insertIdx, 0, m.name)
-  }
-  return result
+  if (!order.length) return allPlugins.map((p) => p.name)
+  return order
 }
 
-/**
- * Sort plugins by stored order, falling back to weight > alphabetical.
- * Plugins not in the order list appear based on their weight rather than being unconditionally demoted.
- */
-function sortByOrder(plugins: PluginMeta[], order: string[]): PluginMeta[] {
-  if (!order.length) {
-    return [...plugins].sort(comparePluginOrder)
-  }
-  const rank = new Map<string, number>()
-  for (let i = 0; i < order.length; i++) {
-    rank.set(order[i].toLowerCase(), i)
-  }
-  return [...plugins].sort((a, b) => {
-    const inOrderA = rank.has(a.name.toLowerCase())
-    const inOrderB = rank.has(b.name.toLowerCase())
-    if (inOrderA && inOrderB) {
-      return (rank.get(a.name.toLowerCase())!) - (rank.get(b.name.toLowerCase())!)
-    }
-    // 某一方不在排序列表时，有效权重优先，防止新加入的高权重源被沉底
-    const weightDiff = comparePluginOrder(a, b)
-    if (weightDiff !== 0) return weightDiff
-    const ra = rank.get(a.name.toLowerCase()) ?? order.length
-    const rb = rank.get(b.name.toLowerCase()) ?? order.length
-    return ra - rb
-  })
+export function sortByOrder(
+  plugins: PluginMeta[],
+  _order?: string[],
+  ctx?: WeightContext,
+): PluginMeta[] {
+  return [...plugins].sort((a, b) => comparePluginOrder(a, b, ctx))
 }
 
-function getSiteDefaultPluginsConfig(): { pluginOrder?: string[]; disabledPlugins?: string[] } | null {
+function getSiteDefaultPluginsConfig(): {
+  pluginOrder?: string[]
+  pluginWeights?: Record<string, number>
+  disabledPlugins?: string[]
+} | null {
   if (typeof localStorage === 'undefined') return null
   try {
     const raw = localStorage.getItem('animaku-site-config-cache')
     if (raw) {
-      const parsed = JSON.parse(raw) as { defaultSettings?: { pluginOrder?: string[]; disabledPlugins?: string[] } }
+      const parsed = JSON.parse(raw) as {
+        defaultSettings?: {
+          pluginOrder?: string[]
+          pluginWeights?: Record<string, number>
+          disabledPlugins?: string[]
+        }
+      }
       return parsed.defaultSettings || null
     }
   } catch {}
   return null
 }
 
-export function seedFromDefaultsWithSiteOverrides(): { plugins: PluginMeta[]; pluginOrder: string[] } {
+export function seedFromDefaultsWithSiteOverrides(): {
+  plugins: PluginMeta[]
+  pluginWeights: Record<string, number>
+  pluginOrder: string[]
+} {
   let plugins = seedFromDefaults()
   const d = getSiteDefaultPluginsConfig()
   if (d?.disabledPlugins && Array.isArray(d.disabledPlugins)) {
@@ -249,8 +228,10 @@ export function seedFromDefaultsWithSiteOverrides(): { plugins: PluginMeta[]; pl
       enabled: !disabledSet.has(p.name.toLowerCase()),
     }))
   }
-  const pluginOrder = d?.pluginOrder && Array.isArray(d.pluginOrder) ? d.pluginOrder : []
-  return { plugins, pluginOrder }
+  const pluginWeights =
+    d?.pluginWeights && typeof d.pluginWeights === 'object' ? d.pluginWeights : {}
+  const pluginOrder = plugins.map((p) => p.name)
+  return { plugins, pluginWeights, pluginOrder }
 }
 
 export const usePluginStore = create<PluginState>()(
@@ -258,7 +239,8 @@ export const usePluginStore = create<PluginState>()(
     (set, get) => ({
       plugins: seedFromDefaultsWithSiteOverrides().plugins,
       defaultsVersion: PLUGIN_DEFAULTS_VERSION,
-      pluginOrder: seedFromDefaultsWithSiteOverrides().pluginOrder,
+      userPluginWeights: {},
+      pluginOrder: [],
       importRule: (raw, opts) => {
         const rule = parsePluginRule(raw)
         const meta = toMeta(
@@ -277,18 +259,9 @@ export const usePluginStore = create<PluginState>()(
           const rest = prev.filter(
             (p) => p.id.toLowerCase() !== meta.id.toLowerCase(),
           )
-          // If user has a custom pluginOrder, preserve the new rule at the end of custom order (or let fallback rank it)
-          const newOrder = s.pluginOrder.slice()
-          if (
-            newOrder.length > 0 &&
-            !newOrder.some((n) => n.toLowerCase() === meta.name.toLowerCase())
-          ) {
-            newOrder.push(meta.name)
-          }
           return {
             plugins: [meta, ...rest],
             defaultsVersion: PLUGIN_DEFAULTS_VERSION,
-            pluginOrder: newOrder,
           }
         })
         return meta
@@ -298,20 +271,13 @@ export const usePluginStore = create<PluginState>()(
           const plugin = normalizePlugins(s.plugins).find((p) => p.id === id)
           if (plugin && isBuiltinPlugin(plugin)) return s
           const remaining = normalizePlugins(s.plugins).filter((p) => p.id !== id)
-          const stillHasSameName = Boolean(
-            plugin &&
-              remaining.some(
-                (p) => p.name.toLowerCase() === plugin.name.toLowerCase(),
-              ),
-          )
+          const nextWeights = { ...(s.userPluginWeights || {}) }
+          if (plugin?.name) {
+            delete nextWeights[plugin.name.toLowerCase()]
+          }
           return {
             plugins: remaining,
-            pluginOrder:
-              plugin && !stillHasSameName
-                ? s.pluginOrder.filter(
-                    (n) => n.toLowerCase() !== plugin.name.toLowerCase(),
-                  )
-                : s.pluginOrder,
+            userPluginWeights: nextWeights,
           }
         }),
       togglePlugin: (id, enabled) =>
@@ -332,13 +298,58 @@ export const usePluginStore = create<PluginState>()(
             p.id === id ? { ...p, proxy } : p,
           ),
         })),
-      setPluginOrder: (order) => set({ pluginOrder: order.filter(Boolean) }),
-      getEnabled: () => {
+      setPluginWeight: (name, weight) =>
+        set((s) => ({
+          userPluginWeights: {
+            ...(s.userPluginWeights || {}),
+            [name.toLowerCase()]: weight,
+          },
+        })),
+      reorderPlugins: (orderedNames) =>
+        set((s) => {
+          const weights: Record<string, number> = {}
+          const step = 1000
+          const total = orderedNames.length
+          orderedNames.forEach((name, index) => {
+            weights[name.toLowerCase()] = (total - index) * step
+          })
+          return {
+            userPluginWeights: weights,
+            pluginOrder: orderedNames,
+          }
+        }),
+      pinPluginToTop: (name) => {
+        const key = name.toLowerCase()
         const enabled = normalizePlugins(get().plugins).filter(
           (p) => p.enabled !== false,
         )
-        const order = get().pluginOrder || []
-        return sortByOrder(enabled, order)
+        const currentSorted = [...enabled].sort((a, b) =>
+          comparePluginOrder(a, b, { userWeights: get().userPluginWeights }),
+        )
+        const orderedNames = [
+          name,
+          ...currentSorted.map((p) => p.name).filter((n) => n.toLowerCase() !== key),
+        ]
+        get().reorderPlugins(orderedNames)
+      },
+      resetWeightsToDefault: () =>
+        set({
+          userPluginWeights: {},
+          pluginOrder: [],
+        }),
+      setPluginOrder: (order) => {
+        get().reorderPlugins(order.filter(Boolean))
+      },
+      getEnabled: (ctx) => {
+        const enabled = normalizePlugins(get().plugins).filter(
+          (p) => p.enabled !== false,
+        )
+        const userWeights = get().userPluginWeights || {}
+        const mergedCtx: WeightContext = {
+          userWeights,
+          ...(ctx || {}),
+        }
+        return [...enabled].sort((a, b) => comparePluginOrder(a, b, mergedCtx))
       },
       getByName: (name) => {
         const key = name.toLowerCase()
@@ -349,19 +360,16 @@ export const usePluginStore = create<PluginState>()(
       ensureDefaults: () => {
         const plugins = normalizePlugins(get().plugins)
         const ver = get().defaultsVersion ?? 0
-        // Empty → seed; version bump → re-seed only if still purely old built-ins
-        // or empty. User-imported rules are kept.
         if (plugins.length === 0) {
           const seeded = seedFromDefaultsWithSiteOverrides()
           set({
             plugins: seeded.plugins,
             defaultsVersion: PLUGIN_DEFAULTS_VERSION,
-            pluginOrder: seeded.pluginOrder,
+            userPluginWeights: {},
+            pluginOrder: [],
           })
           return
         }
-        // Already on current defaults version: still merge any *new* built-ins
-        // and sync weights without touching user-imported rules; apply new ordering strategy.
         if (ver >= PLUGIN_DEFAULTS_VERSION) {
           const seedByName = new Map(
             seedFromDefaults().map((p) => [p.name.toLowerCase(), p]),
@@ -455,14 +463,11 @@ export const usePluginStore = create<PluginState>()(
         )
         if (onlyLegacyBuiltins) {
           const seeded = seedFromDefaultsWithSiteOverrides()
-          const finalOrder =
-            seeded.pluginOrder.length > 0
-              ? mergeOrderWithNewPlugins(seeded.pluginOrder, seeded.plugins)
-              : seeded.pluginOrder
           set({
             plugins: seeded.plugins,
             defaultsVersion: PLUGIN_DEFAULTS_VERSION,
-            pluginOrder: finalOrder,
+            userPluginWeights: {},
+            pluginOrder: seeded.pluginOrder,
           })
           return
         }
@@ -514,14 +519,11 @@ export const usePluginStore = create<PluginState>()(
       },
       resetToDefaults: () => {
         const seeded = seedFromDefaultsWithSiteOverrides()
-        const finalOrder =
-          seeded.pluginOrder.length > 0
-            ? mergeOrderWithNewPlugins(seeded.pluginOrder, seeded.plugins)
-            : seeded.pluginOrder
         set({
           plugins: seeded.plugins,
           defaultsVersion: PLUGIN_DEFAULTS_VERSION,
-          pluginOrder: finalOrder,
+          userPluginWeights: {},
+          pluginOrder: seeded.pluginOrder,
         })
       },
     }),
@@ -536,6 +538,7 @@ export const usePluginStore = create<PluginState>()(
       partialize: (s) => ({
         plugins: s.plugins,
         defaultsVersion: s.defaultsVersion,
+        userPluginWeights: s.userPluginWeights,
         pluginOrder: s.pluginOrder,
       }),
       migrate: (persisted, fromVersion) => {
@@ -592,6 +595,10 @@ export const usePluginStore = create<PluginState>()(
           ...current,
           plugins,
           defaultsVersion: wasEmpty ? PLUGIN_DEFAULTS_VERSION : persistedVer,
+          userPluginWeights:
+            p.userPluginWeights && typeof p.userPluginWeights === 'object'
+              ? p.userPluginWeights
+              : {},
           pluginOrder: Array.isArray(p.pluginOrder) ? p.pluginOrder : [],
         }
       },

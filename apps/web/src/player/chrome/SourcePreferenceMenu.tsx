@@ -1,8 +1,9 @@
 import { useCallback, useMemo } from 'react'
 import clsx from 'clsx'
-import type { PluginMeta } from '@animaku/shared'
+import type { PluginMeta, WeightContext } from '@animaku/shared'
 import { comparePluginOrder } from '@animaku/shared'
 import { usePluginStore } from '../../stores/plugins'
+import { useSiteConfigStore } from '../../stores/site-config'
 import {
   IconChevronLeft,
   IconChevronUp,
@@ -17,26 +18,6 @@ export interface SourcePreferenceMenuProps {
   isMobile?: boolean
 }
 
-/** Sort plugins by user-defined order, falling back to built-in weight order. */
-function sortPluginsByOrder(
-  plugins: PluginMeta[],
-  order: string[],
-): PluginMeta[] {
-  if (!order.length) {
-    return [...plugins].sort(comparePluginOrder)
-  }
-  const rank = new Map<string, number>()
-  for (let i = 0; i < order.length; i++) {
-    rank.set(order[i].toLowerCase(), i)
-  }
-  return [...plugins].sort((a, b) => {
-    const ra = rank.get(a.name.toLowerCase()) ?? order.length
-    const rb = rank.get(b.name.toLowerCase()) ?? order.length
-    if (ra !== rb) return ra - rb
-    return comparePluginOrder(a, b)
-  })
-}
-
 export function SourcePreferenceMenu({
   onBack,
   title = '视频源偏好',
@@ -44,14 +25,23 @@ export function SourcePreferenceMenu({
   isMobile = false,
 }: SourcePreferenceMenuProps) {
   const plugins = usePluginStore((s) => (Array.isArray(s.plugins) ? s.plugins : []))
-  const pluginOrder = usePluginStore((s) => (Array.isArray(s.pluginOrder) ? s.pluginOrder : []))
-  const setPluginOrder = usePluginStore((s) => s.setPluginOrder)
+  const userPluginWeights = usePluginStore((s) => s.userPluginWeights || {})
+  const siteAdminWeights = useSiteConfigStore((s) => s.defaultSettings?.pluginWeights)
+  const reorderPlugins = usePluginStore((s) => s.reorderPlugins)
+  const resetWeightsToDefault = usePluginStore((s) => s.resetWeightsToDefault)
   const togglePlugin = usePluginStore((s) => s.togglePlugin)
-  const resetToDefaults = usePluginStore((s) => s.resetToDefaults)
+
+  const weightContext = useMemo<WeightContext>(
+    () => ({
+      adminWeights: siteAdminWeights,
+      userWeights: userPluginWeights,
+    }),
+    [siteAdminWeights, userPluginWeights],
+  )
 
   const sortedPlugins = useMemo(
-    () => sortPluginsByOrder(plugins, pluginOrder),
-    [plugins, pluginOrder],
+    () => [...plugins].sort((a, b) => comparePluginOrder(a, b, weightContext)),
+    [plugins, weightContext],
   )
 
   const enabledCount = useMemo(
@@ -71,13 +61,13 @@ export function SourcePreferenceMenu({
 
       const nextNames = [...names]
       ;[nextNames[idx], nextNames[target]] = [nextNames[target], nextNames[idx]]
-      setPluginOrder(nextNames)
+      reorderPlugins(nextNames)
 
       if (target === 0) {
         onFlashHint?.(`已将「${name}」设为默认首选源`, 1600)
       }
     },
-    [sortedPlugins, setPluginOrder, onFlashHint],
+    [sortedPlugins, reorderPlugins, onFlashHint],
   )
 
   const handleToggle = useCallback(
@@ -93,9 +83,9 @@ export function SourcePreferenceMenu({
   )
 
   const handleReset = useCallback(() => {
-    resetToDefaults()
-    onFlashHint?.('已恢复官方默认推荐配置', 1600)
-  }, [resetToDefaults, onFlashHint])
+    resetWeightsToDefault()
+    onFlashHint?.('已重置个人排序偏好', 1600)
+  }, [resetWeightsToDefault, onFlashHint])
 
   return (
     <div className="kz-source-pref-menu flex flex-col w-full max-h-[min(18rem,65vh)] select-none">

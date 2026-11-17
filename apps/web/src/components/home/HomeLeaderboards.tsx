@@ -82,11 +82,11 @@ function LeaderboardPosterCard({
         </div>
       )}
 
-      {/* 右上角观看数：樱花粉色；手机端紧凑单位 (如 5.6万 人看过)，桌面端显示完整 */}
+      {/* 右上角观看数：樱花粉色；手机端紧凑单位 (如 5.6万 次观看)，桌面端显示完整 */}
       <div className="pointer-events-none absolute right-2 top-2 z-10 flex items-center text-pink-200 [text-shadow:0_1px_3px_rgba(0,0,0,0.95)]">
         <span className="text-[11.5px] sm:text-[12.5px] font-medium tabular-nums leading-none">
-          <span className="sm:hidden">{formatCompactPlayCount(totalPlayCount)} 人看过</span>
-          <span className="hidden sm:inline">{formatPlayCount(totalPlayCount)} 人看过</span>
+          <span className="sm:hidden">{formatCompactPlayCount(totalPlayCount)} 次观看</span>
+          <span className="hidden sm:inline">{formatPlayCount(totalPlayCount)} 次观看</span>
         </span>
       </div>
 

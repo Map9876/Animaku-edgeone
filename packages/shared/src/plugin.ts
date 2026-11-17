@@ -202,15 +202,24 @@ export function resolveBoostedPluginNames(
   return result
 }
 
+export interface WeightContext {
+  isOldAnime?: boolean
+  boostedPluginNames?: Set<string> | string[]
+  adminWeights?: Record<string, number> | null
+  userWeights?: Record<string, number> | null
+}
+
 /**
- * 计算插件在当前上下文下的有效权重：
+ * 计算插件在当前上下文下的有效总分（Total Effective Weight）：
  * 1. 基础权重：显式 weight 或内置源默认 50，第三方源默认 0。
- * 2. 老番加权：若 isOldAnime 为 true 且启用了 oldAnimePriority，额外 +12 权重。
- * 3. 番剧专属加权：若当前插件名称命中 boostedPluginNames，额外 +20 权重。
+ * 2. 老番动态加权：若 isOldAnime 为 true 且启用了 oldAnimePriority，额外 +15 权重（可反超同梯队普通源）。
+ * 3. 番剧专属加权：若当前插件命中 boostedPluginNames，额外 +500 权重。
+ * 4. 站点 Admin 偏好加权：根据 adminWeights 累加站点级偏移。
+ * 5. 用户客户端本地偏好加权：根据 userWeights 累加用户级偏移（最高优先级）。
  */
-export function getPluginEffectiveWeight(
+export function getPluginTotalWeight(
   p: { name?: string; weight?: number; source?: string; oldAnimePriority?: boolean },
-  isOldAnime = false,
+  ctxOrIsOld: WeightContext | boolean = false,
   boostedPluginNames?: Set<string> | string[],
 ): number {
   let base = 0
@@ -219,37 +228,67 @@ export function getPluginEffectiveWeight(
   } else {
     base = p.source === 'builtin' ? 50 : 0
   }
-  if (isOldAnime && p.oldAnimePriority) {
-    base += 12
+
+  const isOld = typeof ctxOrIsOld === 'boolean' ? ctxOrIsOld : Boolean(ctxOrIsOld.isOldAnime)
+  const boosted = typeof ctxOrIsOld === 'boolean' ? boostedPluginNames : ctxOrIsOld.boostedPluginNames
+  const adminWeights = typeof ctxOrIsOld === 'object' && ctxOrIsOld ? ctxOrIsOld.adminWeights : undefined
+  const userWeights = typeof ctxOrIsOld === 'object' && ctxOrIsOld ? ctxOrIsOld.userWeights : undefined
+
+  // 1. 老番场景加权 (+15)
+  if (isOld && p.oldAnimePriority) {
+    base += 15
   }
-  if (boostedPluginNames) {
-    const key = (p.name || '').toLowerCase()
+
+  const key = (p.name || '').toLowerCase()
+
+  // 2. 番剧专属加权 (+500)
+  if (boosted) {
     const hit =
-      boostedPluginNames instanceof Set
-        ? boostedPluginNames.has(key)
-        : boostedPluginNames.some((n) => n.toLowerCase() === key)
+      boosted instanceof Set
+        ? boosted.has(key)
+        : boosted.some((n) => n.toLowerCase() === key)
     if (hit) {
-      base += 20
+      base += 500
     }
   }
+
+  // 3. 排位加权（层级覆盖制：用户自定义 > 管理员全局 > 默认）
+  // 用户一旦配置了个人排序，全权按用户个人规则生效；未配置时才回退至站点管理员全局排序
+  const hasUserWeights = Boolean(
+    userWeights && typeof userWeights === 'object' && Object.keys(userWeights).length > 0,
+  )
+  let rankBonus = 0
+  if (hasUserWeights) {
+    rankBonus =
+      userWeights && typeof userWeights[key] === 'number' ? userWeights[key] : 0
+  } else if (
+    adminWeights &&
+    typeof adminWeights === 'object' &&
+    typeof adminWeights[key] === 'number'
+  ) {
+    rankBonus = adminWeights[key]
+  }
+
+  base += rankBonus
+
   return base
 }
 
+export const getPluginEffectiveWeight = getPluginTotalWeight
+
 /**
  * Compare two plugins for display ordering:
- * 1. Higher weight first (built-in sources default to 50; third-party/imported sources default to 0).
- *    When isOldAnime is true, plugins with oldAnimePriority receive +12 weight bonus.
- *    When boostedPluginNames contains the plugin, it receives +20 weight bonus.
+ * 1. Higher total effective weight first (pure score descending).
  * 2. Equal weights tie-break alphabetically by plugin name (case-insensitive, stable).
  */
 export function comparePluginOrder(
   a: { name?: string; weight?: number; source?: string; oldAnimePriority?: boolean },
   b: { name?: string; weight?: number; source?: string; oldAnimePriority?: boolean },
-  isOldAnime = false,
+  ctxOrIsOld: WeightContext | boolean = false,
   boostedPluginNames?: Set<string> | string[],
 ): number {
-  const wa = getPluginEffectiveWeight(a, isOldAnime, boostedPluginNames)
-  const wb = getPluginEffectiveWeight(b, isOldAnime, boostedPluginNames)
+  const wa = getPluginTotalWeight(a, ctxOrIsOld, boostedPluginNames)
+  const wb = getPluginTotalWeight(b, ctxOrIsOld, boostedPluginNames)
   if (wa !== wb) {
     return wb - wa
   }
@@ -261,65 +300,37 @@ export function comparePluginOrder(
 }
 
 /**
- * First enabled plugin based on user order, falling back to weight > alphabetical name order.
- * This is the default source auto-searched on first visit.
- * When isOldAnime is true, plugins with oldAnimePriority receive +12 weight bonus.
- * When boostedPluginNames contains the plugin, it receives +20 weight bonus in weight fallback.
+ * First enabled plugin based on total effective score descending.
+ * Pure scoring eliminates brittle array-index ordering conflicts.
  */
 export function findDefaultSourcePlugin(
   list: PluginMeta[],
-  order: string[],
+  ctxOrOrder?: WeightContext | string[],
   isOldAnime = false,
   boostedPluginNames?: Set<string> | string[],
 ): PluginMeta | undefined {
   if (!list.length) return undefined
 
-  // 1. 命中当前番剧专属加权的源具备优先首选权（多源加权时保留其相对顺序）
-  if (boostedPluginNames) {
-    const isBoosted = (p: PluginMeta) => {
-      const key = (p.name || '').toLowerCase()
-      return boostedPluginNames instanceof Set
-        ? boostedPluginNames.has(key)
-        : boostedPluginNames.some((n) => n.toLowerCase() === key)
-    }
-    const boostedList = list.filter(isBoosted)
-    if (boostedList.length > 0) {
-      if (order.length) {
-        for (const name of order) {
-          const hit = boostedList.find(
-            (p) => p.name.toLowerCase() === name.toLowerCase(),
-          )
-          if (hit) return hit
-        }
-      }
-      return [...boostedList].sort((a, b) => comparePluginOrder(a, b, isOldAnime, boostedPluginNames))[0]
-    }
+  if (ctxOrOrder && !Array.isArray(ctxOrOrder)) {
+    return [...list].sort((a, b) => comparePluginOrder(a, b, ctxOrOrder))[0]
   }
 
-  // 2. 无加权命中时，按用户/系统自定义顺序或基础权重排序
-  if (order.length) {
-    // Find first plugin whose name appears in the user's order
-    for (const name of order) {
-      const hit = list.find(
-        (p) => p.name.toLowerCase() === name.toLowerCase(),
-      )
-      if (hit) return hit
-    }
+  const ctx: WeightContext = {
+    isOldAnime,
+    boostedPluginNames,
   }
-  // Fallback: weight descending > alphabetical name order.
-  return [...list].sort((a, b) => comparePluginOrder(a, b, isOldAnime, boostedPluginNames))[0]
+  return [...list].sort((a, b) => comparePluginOrder(a, b, ctx))[0]
 }
 
 /**
  * Resolve initial target plugin:
  * Only explicit qPlugin (e.g. from history deep-link / shared URL) overrides default source.
- * Regular entry points (no qPlugin in URL) strictly fallback to global default source,
- * never leaking lastHistory to avoid hijacking user-configured default source priority.
+ * Regular entry points strictly fallback to global default source.
  */
 export function resolveTargetSourcePlugin(
   qPlugin: string | undefined | null,
   plugins: PluginMeta[],
-  pluginOrder: string[],
+  ctxOrOrder?: WeightContext | string[],
   isOldAnime = false,
   getFallbackPlugin?: (name: string) => PluginMeta | undefined,
   boostedPluginNames?: Set<string> | string[],
@@ -331,7 +342,7 @@ export function resolveTargetSourcePlugin(
       getFallbackPlugin?.(normQ)
     if (hit) return hit
   }
-  return findDefaultSourcePlugin(plugins, pluginOrder, isOldAnime, boostedPluginNames)
+  return findDefaultSourcePlugin(plugins, ctxOrOrder, isOldAnime, boostedPluginNames)
 }
 
 export interface SearchItem {

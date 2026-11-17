@@ -12,6 +12,8 @@ import {
   type BangumiItem,
   type PluginMeta,
   type SearchItem,
+  isOldAnime,
+  getPluginTotalWeight,
   resolveBoostedPluginNames,
 } from '@animaku/shared'
 import { DEFAULT_PLUGIN_RULES } from '../../data/default-plugins'
@@ -22,6 +24,7 @@ import {
 import type { SourceSelection, SearchRow } from '../../lib/use-watch-session'
 import { useAutoSourcePick } from './use-auto-source-pick'
 import { useSiteConfigStore } from '../../stores/site-config'
+import { usePluginStore } from '../../stores/plugins'
 import { KzButton, KzInput } from '../../components/ui'
 import { useKeyedCooldownCallback } from '../../lib/use-cooldown'
 
@@ -187,9 +190,23 @@ export function SourceBoard({
   }, [isAutoProbing, onAutoProbingChange])
 
   const sourceBangumiIds = useSiteConfigStore((s) => s.defaultSettings?.sourceBangumiIds)
+  const siteAdminWeights = useSiteConfigStore((s) => s.defaultSettings?.pluginWeights)
+  const userPluginWeights = usePluginStore((s) => s.userPluginWeights)
+  const isOld = useMemo(() => isOldAnime(bangumiItem?.airDate), [bangumiItem?.airDate])
+
   const boostedPluginNames = useMemo(
     () => resolveBoostedPluginNames(bangumiId, sourceBangumiIds),
     [bangumiId, sourceBangumiIds],
+  )
+
+  const weightContext = useMemo(
+    () => ({
+      isOldAnime: isOld,
+      boostedPluginNames,
+      adminWeights: siteAdminWeights,
+      userWeights: userPluginWeights,
+    }),
+    [isOld, boostedPluginNames, siteAdminWeights, userPluginWeights],
   )
 
   const { onUserAction, pendingCandidateName } = useAutoSourcePick({
@@ -199,6 +216,7 @@ export function SourceBoard({
     pluginOrder,
     inFlightPlugins,
     boostedPluginNames,
+    weightContext,
     allFallbacksExhausted,
     onSwitchSource,
     onAllFallbacksFailed,
@@ -414,6 +432,15 @@ export function SourceBoard({
                         {isDefault && (
                           <span className="rounded bg-[var(--kz-bg-soft)] px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-[var(--kz-fg-muted)] border border-[var(--kz-border-subtle)]">
                             默认
+                          </span>
+                        )}
+
+                        {isOld && plugin.oldAnimePriority && (
+                          <span
+                            className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9.5px] font-medium leading-none text-amber-500 border border-amber-500/20"
+                            title="经典老番场景获得 +15 权重加权"
+                          >
+                            老番优先
                           </span>
                         )}
 

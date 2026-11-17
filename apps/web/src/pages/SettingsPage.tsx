@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { PluginMeta } from '@animaku/shared'
 import {
   comparePluginOrder,
+  getPluginTotalWeight,
   PLAYER_SPEEDS,
   bangumiOAuthUrl,
   isAnxRule,
@@ -18,6 +19,7 @@ import {
   DEFAULT_BANGUMI_IMAGE_HOST,
 } from '../lib/bangumi-image-host'
 import { useSettingsStore } from '../stores/settings'
+import { useSiteConfigStore } from '../stores/site-config'
 import { isBuiltinPlugin, usePluginStore } from '../stores/plugins'
 import {
   PageHeader,
@@ -121,7 +123,9 @@ function PluginReorderCard({
   index,
   isFirst,
   isLast,
+  effectiveScore,
   onMove,
+  onPin,
   onRemove,
   onToggle,
 }: {
@@ -129,7 +133,9 @@ function PluginReorderCard({
   index: number
   isFirst: boolean
   isLast: boolean
+  effectiveScore: number
   onMove: (name: string, dir: -1 | 1) => void
+  onPin?: (name: string) => void
   onRemove: (id: string) => void
   onToggle: (id: string) => void
 }) {
@@ -209,18 +215,40 @@ function PluginReorderCard({
                 v{plugin.version || '?'}
               </span>
               {renderPluginBadge(plugin)}
+              {plugin.oldAnimePriority && (
+                <span
+                  className="rounded bg-amber-500/15 px-1.5 py-0.2 text-[9.5px] font-medium leading-none text-amber-500 border border-amber-500/20"
+                  title="老番场景自动 +15 权重优先"
+                >
+                  老番优先
+                </span>
+              )}
               {isFirst && (
                 <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.2 text-[9.5px] sm:text-[10px] font-semibold text-amber-500 dark:text-amber-400 shadow-xs">
                   <span>⭐</span>
                   <span>默认主源</span>
                 </span>
               )}
+              <span className="rounded bg-[var(--kz-bg-soft)] px-1.5 py-0.2 font-mono text-[9.5px] text-[var(--kz-fg-dim)] border border-[var(--kz-border-subtle)]" title="当前有效总分（分高者居前）">
+                分值: {effectiveScore}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* 右侧：删除按钮（自定义规则） + Switch 开关 */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* 右侧：置顶 + 删除 + Switch 开关 */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {!isFirst && onPin && (
+            <button
+              type="button"
+              onClick={() => onPin(plugin.name)}
+              className="inline-flex items-center gap-0.5 rounded-md border border-[var(--kz-border)] bg-[var(--kz-bg-soft)] px-1.5 py-0.5 text-[10.5px] font-medium text-[var(--kz-fg-muted)] hover:text-[var(--kz-accent)] hover:border-[var(--kz-accent)] transition-all cursor-pointer"
+              title="一键置顶为第 1 顺位默认源"
+            >
+              <span>🔝</span>
+              <span className="hidden sm:inline">置顶</span>
+            </button>
+          )}
           {!isBuiltinPlugin(plugin) && (
             <button
               type="button"
@@ -281,10 +309,11 @@ export function SettingsPage() {
   const togglePlugin = usePluginStore((s) => s.togglePlugin)
   const ensureDefaults = usePluginStore((s) => s.ensureDefaults)
   const resetToDefaults = usePluginStore((s) => s.resetToDefaults)
-  const pluginOrder = usePluginStore((s) =>
-    Array.isArray(s.pluginOrder) ? s.pluginOrder : [],
-  )
-  const setPluginOrder = usePluginStore((s) => s.setPluginOrder)
+  const userPluginWeights = usePluginStore((s) => s.userPluginWeights || {})
+  const siteAdminWeights = useSiteConfigStore((s) => s.defaultSettings?.pluginWeights)
+  const reorderPlugins = usePluginStore((s) => s.reorderPlugins)
+  const pinPluginToTop = usePluginStore((s) => s.pinPluginToTop)
+  const resetWeightsToDefault = usePluginStore((s) => s.resetWeightsToDefault)
 
   const [tokenInput, setTokenInput] = useState(bangumiToken)
   const [tokenMsg, setTokenMsg] = useState('')
@@ -336,15 +365,23 @@ export function SettingsPage() {
     return items.join(' · ')
   }, [theme, nav])
 
-  /** User order within plugins list. */
+  const weightContext = useMemo(
+    () => ({
+      adminWeights: siteAdminWeights,
+      userWeights: userPluginWeights,
+    }),
+    [siteAdminWeights, userPluginWeights],
+  )
+
+  /** Plugins sorted strictly by total effective score descending */
   const sortedPlugins = useMemo(
-    () => sortPluginsByOrder(plugins, pluginOrder),
-    [plugins, pluginOrder],
+    () => [...plugins].sort((a, b) => comparePluginOrder(a, b, weightContext)),
+    [plugins, weightContext],
   )
 
   /**
-   * Move a plugin up/down in the user sort order.
-   * Reads current live `sortedPlugins` names to build the new order list.
+   * Move a plugin up/down in user preference order.
+   * Re-assigns stepped weight offsets according to the new sequence.
    */
   const movePlugin = useCallback(
     (name: string, dir: -1 | 1) => {
@@ -356,9 +393,9 @@ export function SettingsPage() {
       const target = idx + dir
       if (target < 0 || target >= names.length) return
       ;[names[idx], names[target]] = [names[target], names[idx]]
-      setPluginOrder(names)
+      reorderPlugins(names)
     },
-    [sortedPlugins, setPluginOrder],
+    [sortedPlugins, reorderPlugins],
   )
 
   // 折叠卡片状态管理（支持本地持久化记忆）
@@ -875,6 +912,17 @@ export function SettingsPage() {
               variant="secondary"
               size="sm"
               onClick={() => {
+                resetWeightsToDefault()
+                setPluginMsg('已重置个人排序偏好，恢复为站点默认')
+              }}
+              title="清除个人排序偏好，恢复站点与出厂默认顺序"
+            >
+              ↺ 重置排序
+            </KzButton>
+            <KzButton
+              variant="secondary"
+              size="sm"
+              onClick={() => {
                 if (
                   window.confirm(
                     '将清空当前规则并恢复为内置默认，确定？',
@@ -885,7 +933,7 @@ export function SettingsPage() {
                 }
               }}
             >
-              ↺ 恢复默认
+              出厂规则
             </KzButton>
           </div>
         </div>
@@ -936,7 +984,7 @@ export function SettingsPage() {
           axis="y"
           values={sortedPlugins}
           onReorder={(newPlugins) => {
-            setPluginOrder(newPlugins.map((p) => p.name))
+            reorderPlugins(newPlugins.map((p) => p.name))
           }}
           className="space-y-2 list-none p-0 m-0"
         >
@@ -947,7 +995,9 @@ export function SettingsPage() {
               index={idx + 1}
               isFirst={idx === 0}
               isLast={idx === sortedPlugins.length - 1}
+              effectiveScore={getPluginTotalWeight(p, weightContext)}
               onMove={movePlugin}
+              onPin={pinPluginToTop}
               onRemove={removePlugin}
               onToggle={togglePlugin}
             />

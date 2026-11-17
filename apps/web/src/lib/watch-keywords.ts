@@ -5,6 +5,7 @@ import {
   type BangumiItem,
   type BangumiSeed,
   type PluginMeta,
+  type WeightContext,
 } from '@animaku/shared'
 
 export type BangumiItemLike = BangumiItem | BangumiSeed | null | undefined
@@ -98,27 +99,22 @@ export function resolveKeywordForPlugin(
 }
 
 /**
- * 对视频源搜索行按用户设定顺序排布（未设定时按能力打分与字母序排序）
+ * 对视频源搜索行按统一有效权重从高到低排布（老番场景自动生效加权）
  */
 export function orderSearchRows<T extends { plugin: PluginMeta }>(
   rows: T[],
-  order: string[],
+  orderOrCtx?: string[] | WeightContext,
   isOldAnime = false,
   boostedPluginNames?: Set<string>,
 ): T[] {
-  if (!order.length) {
-    return [...rows].sort((a, b) =>
-      comparePluginOrder(a.plugin, b.plugin, isOldAnime, boostedPluginNames),
-    )
-  }
-  const rank = new Map<string, number>()
-  for (let i = 0; i < order.length; i++) {
-    rank.set(order[i].toLowerCase(), i)
-  }
-  return [...rows].sort((a, b) => {
-    const ra = rank.get(a.plugin.name.toLowerCase()) ?? order.length
-    const rb = rank.get(b.plugin.name.toLowerCase()) ?? order.length
-    if (ra !== rb) return ra - rb
-    return comparePluginOrder(a.plugin, b.plugin, isOldAnime, boostedPluginNames)
-  })
+  const ctx: WeightContext =
+    orderOrCtx && !Array.isArray(orderOrCtx)
+      ? orderOrCtx
+      : {
+          isOldAnime,
+          boostedPluginNames,
+        }
+  return [...rows].sort((a, b) =>
+    comparePluginOrder(a.plugin, b.plugin, ctx),
+  )
 }

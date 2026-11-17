@@ -63,11 +63,13 @@ export interface SiteDefaultSettings {
   nav?: SiteNavDefaults
   player?: SitePlayerDefaults
   danmaku?: SiteDanmakuDefaults
+  /** 站点管理员设置的视频源权重偏移量（key 为源名称小写，value 为增加的权重数值） */
+  pluginWeights?: Record<string, number>
   pluginOrder?: string[]
   disabledPlugins?: string[]
   /**
    * 每个视频源针对特定 Bangumi ID 的专属加权名单（key 为源名称小写，value 为 bangumiId 数组）。
-   * 播放该 ID 的番剧时对应源权重增加 20。
+   * 播放该 ID 的番剧时对应源权重增加 500。
    */
   sourceBangumiIds?: Record<string, number[]>
 }

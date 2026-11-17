@@ -176,15 +176,17 @@ test('parsePluginRule: parses titlePreference correctly', () => {
   assert.equal(ruleDefault.titlePreference, 'chinese')
 })
 
-test('findDefaultSourcePlugin: 遵循用户自定义顺序', () => {
+test('findDefaultSourcePlugin: 遵循用户/Admin自定义加权', () => {
   const mockPlugins: PluginMeta[] = [
     { name: 'xifan-next', version: '1.0.0', weight: 70, enabled: true },
     { name: 'cycani', version: '1.0.0', weight: 65, enabled: true },
     { name: 'anime1', version: '1.0.0', weight: 60, oldAnimePriority: true, enabled: true },
     { name: 'tvtfun', version: '1.0.0', weight: 50, enabled: true },
   ]
-  // 用户明确将 cycani 放在第 1 位
-  const target = findDefaultSourcePlugin(mockPlugins, ['cycani', 'xifan-next'])
+  // 用户明确给 cycani 增加 1000 权重
+  const target = findDefaultSourcePlugin(mockPlugins, {
+    userWeights: { cycani: 1000 },
+  })
   assert.equal(target?.name, 'cycani')
 })
 
@@ -193,18 +195,31 @@ test('findDefaultSourcePlugin: 用户无排序时按权重降序排列', () => {
     { name: 'cycani', version: '1.0.0', weight: 65, enabled: true },
     { name: 'xifan-next', version: '1.0.0', weight: 70, enabled: true },
   ]
-  const target = findDefaultSourcePlugin(mockPlugins, [])
+  const target = findDefaultSourcePlugin(mockPlugins, {})
   assert.equal(target?.name, 'xifan-next')
 })
 
-test('findDefaultSourcePlugin: 老番场景赋予 oldAnimePriority 插件加权', () => {
+test('findDefaultSourcePlugin: 老番场景赋予 oldAnimePriority 插件加权 (+15)', () => {
   const mockPlugins: PluginMeta[] = [
     { name: 'xifan-next', version: '1.0.0', weight: 70, enabled: true },
     { name: 'anime1', version: '1.0.0', weight: 60, oldAnimePriority: true, enabled: true },
   ]
-  // anime1 原权重 60 + 12 = 72，超过 xifan-next 的 70
-  const target = findDefaultSourcePlugin(mockPlugins, [], true)
+  // anime1 原权重 60 + 15 = 75，超过 xifan-next 的 70
+  const target = findDefaultSourcePlugin(mockPlugins, { isOldAnime: true })
   assert.equal(target?.name, 'anime1')
+})
+
+test('findDefaultSourcePlugin: 用户强行置顶时优先于老番加权', () => {
+  const mockPlugins: PluginMeta[] = [
+    { name: 'xifan-next', version: '1.0.0', weight: 70, enabled: true },
+    { name: 'anime1', version: '1.0.0', weight: 60, oldAnimePriority: true, enabled: true },
+  ]
+  // 用户给 xifan-next 置顶加分 10000，即使 anime1 是老番 (+15)，xifan-next 依然保持第一
+  const target = findDefaultSourcePlugin(mockPlugins, {
+    isOldAnime: true,
+    userWeights: { 'xifan-next': 10000 },
+  })
+  assert.equal(target?.name, 'xifan-next')
 })
 
 test('resolveBoostedPluginNames: 正确解析命中当前番剧 ID 的加权源集合', () => {
@@ -225,55 +240,53 @@ test('resolveBoostedPluginNames: 正确解析命中当前番剧 ID 的加权源�
   assert.strictEqual(hitNone.size, 0)
 })
 
-test('getPluginEffectiveWeight: 命中番剧加权时获得 +20 权重', () => {
+test('getPluginEffectiveWeight: 命中番剧加权时获得 +500 权重', () => {
   const cycani: PluginMeta = { name: 'cycani', version: '1.0.0', weight: 59, enabled: true }
   const normalWeight = getPluginEffectiveWeight(cycani, false)
   assert.strictEqual(normalWeight, 59)
 
   const boostedWeight = getPluginEffectiveWeight(cycani, false, new Set(['cycani']))
-  assert.strictEqual(boostedWeight, 79)
+  assert.strictEqual(boostedWeight, 559)
 })
 
-test('findDefaultSourcePlugin: 用户无自定义顺序时，命中番剧专属加权的源提升 20 权重优先当选', () => {
+test('findDefaultSourcePlugin: 命中番剧专属加权的源提升 500 权重优先当选', () => {
   const mockPlugins: PluginMeta[] = [
     { name: 'xifan-next', version: '1.0.0', weight: 61, enabled: true },
     { name: 'cycani', version: '1.0.0', weight: 59, enabled: true },
   ]
   // cycani 原本 59 < xifan-next 61，未加权时默认选 xifan-next
-  const targetNormal = findDefaultSourcePlugin(mockPlugins, [])
+  const targetNormal = findDefaultSourcePlugin(mockPlugins, {})
   assert.strictEqual(targetNormal?.name, 'xifan-next')
 
-  // 给 cycani 加权 20，提升至 79，超过 xifan-next 61，成为首选
+  // 给 cycani 加权 500，提升至 559，超过 xifan-next 61，成为首选
   const boosted = new Set(['cycani'])
-  const targetBoosted = findDefaultSourcePlugin(mockPlugins, [], false, boosted)
+  const targetBoosted = findDefaultSourcePlugin(mockPlugins, { boostedPluginNames: boosted })
   assert.strictEqual(targetBoosted?.name, 'cycani')
 })
 
-test('findDefaultSourcePlugin: 命中番剧专属加权时，专属加权源优先成为首选源', () => {
+test('findDefaultSourcePlugin: 站点 Admin 加权使指定源当选', () => {
   const mockPlugins: PluginMeta[] = [
     { name: 'xifan-next', version: '1.0.0', weight: 61, enabled: true },
     { name: 'cycani', version: '1.0.0', weight: 59, enabled: true },
   ]
-  // 即便原全局顺序 xifan-next 在前
-  const userOrder = ['xifan-next', 'cycani']
-  const boosted = new Set(['cycani'])
-  // cycani 命中该番剧专属加权，成为该番剧的首选源
-  const target = findDefaultSourcePlugin(mockPlugins, userOrder, false, boosted)
+  const target = findDefaultSourcePlugin(mockPlugins, {
+    adminWeights: { cycani: 100 },
+  })
   assert.strictEqual(target?.name, 'cycani')
 })
 
-test('findDefaultSourcePlugin: 多个源命中番剧加权时，保留加权源在原顺序中的相对优先级', () => {
+test('findDefaultSourcePlugin: 用户自定义加权优先覆盖管理员全局加权', () => {
   const mockPlugins: PluginMeta[] = [
     { name: 'xifan-next', version: '1.0.0', weight: 61, enabled: true },
     { name: 'cycani', version: '1.0.0', weight: 59, enabled: true },
-    { name: 'tvtfun', version: '1.0.0', weight: 50, enabled: true },
   ]
-  const userOrder = ['tvtfun', 'cycani', 'xifan-next']
-  // cycani 和 xifan-next 都命中加权，但 tvtfun 没加权
-  const boosted = new Set(['cycani', 'xifan-next'])
-  const target = findDefaultSourcePlugin(mockPlugins, userOrder, false, boosted)
-  // 加权源中，cycani 在 order 里比 xifan-next 更靠前，因此当选
-  assert.strictEqual(target?.name, 'cycani')
+  // 管理员给 cycani 加 30000，但用户将 xifan-next 设为第 1 位 (加 10000)
+  // 覆盖制下，cycani 不再叠加管理员的 30000，用户选择的 xifan-next 稳居第一
+  const target = findDefaultSourcePlugin(mockPlugins, {
+    adminWeights: { cycani: 30000 },
+    userWeights: { 'xifan-next': 10000 },
+  })
+  assert.strictEqual(target?.name, 'xifan-next')
 })
 
 test('resolveTargetSourcePlugin: 普通入口（无 qPlugin）严格返回全局默认源，绝不受历史记录影响', () => {

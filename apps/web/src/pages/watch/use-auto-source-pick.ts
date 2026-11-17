@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import {
   type PluginMeta,
   type SearchItem,
-  getPluginEffectiveWeight,
+  type WeightContext,
+  getPluginTotalWeight,
 } from '@animaku/shared'
 import type { AggregatedSourceState } from '../../lib/use-source-aggregator'
 
@@ -12,7 +13,7 @@ export interface AutoSourcePickDecision {
   higherPriorityInFlight?: string[]
 }
 
-/** 计算插件在用户优先级列表中的排名（越小优先级越高） */
+/** 计算插件在用户优先级列表中的排名（保留向后兼容） */
 export function getPluginRank(pluginName: string, pluginOrder: string[]): number {
   const idx = pluginOrder.findIndex(
     (n) => n.toLowerCase() === pluginName.toLowerCase(),
@@ -22,7 +23,8 @@ export function getPluginRank(pluginName: string, pluginOrder: string[]): number
 
 /**
  * 纯函数裁决逻辑（可独立单测）：
- * 在当前 ready 的候选源中找出最优解，并结合当前正在 probing/排队中的源做出裁决：
+ * 在当前 ready 的候选源中找出按总分（Total Effective Weight）最优解，
+ * 并结合当前正在 probing/排队中的源做出裁决：
  * 1. 无 ready 候选 -> 'none'
  * 2. 有 ready 候选，且无更高优先级的源在排队/探测中 -> 'immediate' (0ms 秒提)
  * 3. 有 ready 候选，但有更高优先级的源在排队/探测中 -> 'wait_grace' (需进入自适应宽限窗口)
@@ -30,8 +32,9 @@ export function getPluginRank(pluginName: string, pluginOrder: string[]): number
 export function resolveAutoSourceDecision(
   sources: Record<string, AggregatedSourceState>,
   inFlightPlugins: string[],
-  pluginOrder: string[],
+  pluginOrder?: string[],
   boostedPluginNames?: Set<string>,
+  weightContext?: WeightContext,
 ): AutoSourcePickDecision {
   const readyCandidates = Object.values(sources).filter(
     (s) => s.status === 'ready' && s.matchedItem && s.plugin,
@@ -41,38 +44,29 @@ export function resolveAutoSourceDecision(
     return { action: 'none' }
   }
 
-  const isBoosted = (name: string) => {
-    if (!boostedPluginNames) return false
-    const key = (name || '').toLowerCase()
-    return boostedPluginNames instanceof Set
-      ? boostedPluginNames.has(key)
-      : (boostedPluginNames as string[]).some((n) => n.toLowerCase() === key)
+  const ctx: WeightContext = {
+    boostedPluginNames,
+    ...(weightContext || {}),
   }
 
-  // 命中专属加权的源排在第一梯队；梯队内部按配置优先级与有效权重从高到低排序
+  // 按总有效权重从高到低排序，同分字母序
   readyCandidates.sort((a, b) => {
-    const hitA = isBoosted(a.plugin.name) ? 1 : 0
-    const hitB = isBoosted(b.plugin.name) ? 1 : 0
-    if (hitA !== hitB) return hitB - hitA
-    const rankA = getPluginRank(a.plugin.name, pluginOrder)
-    const rankB = getPluginRank(b.plugin.name, pluginOrder)
-    if (rankA !== rankB) return rankA - rankB
-    const wa = getPluginEffectiveWeight(a.plugin, false, boostedPluginNames)
-    const wb = getPluginEffectiveWeight(b.plugin, false, boostedPluginNames)
-    return wb - wa
+    const wa = getPluginTotalWeight(a.plugin, ctx)
+    const wb = getPluginTotalWeight(b.plugin, ctx)
+    if (wa !== wb) return wb - wa
+    return a.plugin.name.localeCompare(b.plugin.name)
   })
 
   const bestCandidate = readyCandidates[0]
-  const bestRank = getPluginRank(bestCandidate.plugin.name, pluginOrder)
-  const bestIsBoosted = isBoosted(bestCandidate.plugin.name)
+  const bestWeight = getPluginTotalWeight(bestCandidate.plugin, ctx)
 
   // 检查在 flight 中是否有优先级高于 bestCandidate 的源
   const higherPriorityInFlight = inFlightPlugins.filter((name) => {
     if (name.toLowerCase() === bestCandidate.plugin.name.toLowerCase()) return false
-    const inFlightBoosted = isBoosted(name)
-    if (inFlightBoosted && !bestIsBoosted) return true
-    if (!inFlightBoosted && bestIsBoosted) return false
-    return getPluginRank(name, pluginOrder) < bestRank
+    const inFlightPlugin = sources[name]?.plugin
+    if (!inFlightPlugin) return false
+    const weight = getPluginTotalWeight(inFlightPlugin, ctx)
+    return weight > bestWeight
   })
 
   if (higherPriorityInFlight.length === 0) {
@@ -93,9 +87,10 @@ export interface UseAutoSourcePickOptions {
   bangumiId: number
   enabled: boolean
   sources: Record<string, AggregatedSourceState>
-  pluginOrder: string[]
+  pluginOrder?: string[]
   inFlightPlugins: string[]
   boostedPluginNames?: Set<string>
+  weightContext?: WeightContext
   allFallbacksExhausted?: boolean
   onSwitchSource: (
     plugin: PluginMeta,
@@ -110,9 +105,10 @@ export function useAutoSourcePick({
   bangumiId,
   enabled,
   sources,
-  pluginOrder,
+  pluginOrder = [],
   inFlightPlugins,
   boostedPluginNames,
+  weightContext,
   allFallbacksExhausted = false,
   onSwitchSource,
   onAllFallbacksFailed,
@@ -166,12 +162,17 @@ export function useAutoSourcePick({
       return
     }
 
-    const decision = resolveAutoSourceDecision(sources, inFlightPlugins, pluginOrder, boostedPluginNames)
+    const decision = resolveAutoSourceDecision(
+      sources,
+      inFlightPlugins,
+      pluginOrder,
+      boostedPluginNames,
+      weightContext,
+    )
 
     if (decision.action === 'none') {
       clearGraceTimer()
       setPendingCandidateName(null)
-      // 如果所有保底源均已探测完毕（全灭，无就绪可用源），且尚未触发过，且用户未加锁未选源，仅单次触发保底失败回调（展开面板）
       if (
         allFallbacksExhausted &&
         !autoPickedRef.current &&
@@ -196,7 +197,6 @@ export function useAutoSourcePick({
     }
 
     // Case 2: 存在更高优先级源在探测，进入自适应宽限
-    // 如果当前 candidate 与正在等待的 candidate 不一致，重置计时器为新的最优候选
     setPendingCandidateName(candidate.plugin.name)
 
     if (!graceTimerRef.current) {
@@ -213,6 +213,8 @@ export function useAutoSourcePick({
     sources,
     inFlightPlugins,
     pluginOrder,
+    boostedPluginNames,
+    weightContext,
     allFallbacksExhausted,
     onAllFallbacksFailed,
     gracePeriodMs,

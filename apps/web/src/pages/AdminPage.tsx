@@ -17,6 +17,7 @@ import {
   BANGUMI_IMAGE_HOST_BANGUMI,
   BANGUMI_IMAGE_HOST_MIRROR,
   comparePluginOrder,
+  getPluginTotalWeight,
   defaultDanmakuSettings,
   defaultPlayerSettings,
   isAnxRule,
@@ -348,6 +349,12 @@ function AdminDashboard() {
 
   // 视频源规则全局默认排序与启用状态
   const allPlugins = usePluginStore((s) => s.plugins)
+  const [defPluginWeights, setDefPluginWeights] = useState<Record<string, number>>(() => {
+    if (defaultSettings?.pluginWeights && typeof defaultSettings.pluginWeights === 'object') {
+      return defaultSettings.pluginWeights
+    }
+    return {}
+  })
   const [defPluginOrder, setDefPluginOrder] = useState<string[]>(() => {
     if (defaultSettings?.pluginOrder && Array.isArray(defaultSettings.pluginOrder)) {
       return defaultSettings.pluginOrder
@@ -576,6 +583,7 @@ function AdminDashboard() {
 
   const persistPluginsConfig = async (
     order: string[],
+    weights: Record<string, number>,
     disabled: string[],
     boosted: Record<string, number[]>,
   ) => {
@@ -583,6 +591,7 @@ function AdminDashboard() {
     setPluginsMsg('')
     try {
       const res = await saveDefaultSettings({
+        pluginWeights: weights,
         pluginOrder: order,
         disabledPlugins: disabled,
         sourceBangumiIds: boosted,
@@ -616,7 +625,7 @@ function AdminDashboard() {
     const nextBoosted = { ...defSourceBangumiIds, [key]: merged }
     setDefSourceBangumiIds(nextBoosted)
     setPluginIdInputs((prev) => ({ ...prev, [pluginName]: '' }))
-    void persistPluginsConfig(defPluginOrder, defDisabledPlugins, nextBoosted)
+    void persistPluginsConfig(defPluginOrder, defPluginWeights, defDisabledPlugins, nextBoosted)
   }
 
   const handleRemoveBangumiId = (pluginName: string, idToRemove: number) => {
@@ -630,18 +639,20 @@ function AdminDashboard() {
       nextBoosted[key] = next
     }
     setDefSourceBangumiIds(nextBoosted)
-    void persistPluginsConfig(defPluginOrder, defDisabledPlugins, nextBoosted)
+    void persistPluginsConfig(defPluginOrder, defPluginWeights, defDisabledPlugins, nextBoosted)
   }
 
   const handleResetPlugins = async () => {
     const defaultNames = allPlugins.map((p) => p.name)
     setDefPluginOrder(defaultNames)
+    setDefPluginWeights({})
     setDefDisabledPlugins([])
     setDefSourceBangumiIds({})
     setPluginsSaving(true)
     setPluginsMsg('')
     try {
       await saveDefaultSettings({
+        pluginWeights: {},
         pluginOrder: defaultNames,
         disabledPlugins: [],
         sourceBangumiIds: {},
@@ -1035,26 +1046,12 @@ function AdminDashboard() {
     }
   }
 
-  // 视频源排序辅助
+  // 视频源排序辅助：纯有效权重排序
   const sortedDefaultPlugins = useMemo(() => {
-    const list = [...allPlugins]
-    const rank = new Map<string, number>()
-    for (let i = 0; i < defPluginOrder.length; i++) {
-      rank.set(defPluginOrder[i].toLowerCase(), i)
-    }
-    return list.sort((a, b) => {
-      const inOrderA = rank.has(a.name.toLowerCase())
-      const inOrderB = rank.has(b.name.toLowerCase())
-      if (inOrderA && inOrderB) {
-        return (rank.get(a.name.toLowerCase())!) - (rank.get(b.name.toLowerCase())!)
-      }
-      const weightDiff = comparePluginOrder(a, b)
-      if (weightDiff !== 0) return weightDiff
-      const ra = rank.get(a.name.toLowerCase()) ?? defPluginOrder.length
-      const rb = rank.get(b.name.toLowerCase()) ?? defPluginOrder.length
-      return ra - rb
-    })
-  }, [allPlugins, defPluginOrder])
+    return [...allPlugins].sort((a, b) =>
+      comparePluginOrder(a, b, { adminWeights: defPluginWeights }),
+    )
+  }, [allPlugins, defPluginWeights])
 
   const movePluginOrder = (name: string, dir: -1 | 1) => {
     const names = sortedDefaultPlugins.map((p) => p.name)
@@ -1063,8 +1060,15 @@ function AdminDashboard() {
     const target = idx + dir
     if (target < 0 || target >= names.length) return
     ;[names[idx], names[target]] = [names[target], names[idx]]
+    const weights: Record<string, number> = {}
+    const step = 1000
+    const total = names.length
+    names.forEach((n, i) => {
+      weights[n.toLowerCase()] = (total - i) * step
+    })
+    setDefPluginWeights(weights)
     setDefPluginOrder(names)
-    void persistPluginsConfig(names, defDisabledPlugins, defSourceBangumiIds)
+    void persistPluginsConfig(names, weights, defDisabledPlugins, defSourceBangumiIds)
   }
 
   const togglePluginDisabledState = (name: string) => {
@@ -1073,7 +1077,7 @@ function AdminDashboard() {
       ? defDisabledPlugins.filter((n) => n.toLowerCase() !== key)
       : [...defDisabledPlugins, name]
     setDefDisabledPlugins(nextDisabled)
-    void persistPluginsConfig(defPluginOrder, nextDisabled, defSourceBangumiIds)
+    void persistPluginsConfig(defPluginOrder, defPluginWeights, nextDisabled, defSourceBangumiIds)
   }
 
   const previewCurrentIconUrl =
@@ -1802,7 +1806,7 @@ function AdminDashboard() {
           <p className="text-xs text-[var(--kz-fg-muted)] leading-relaxed">
             设定全站新访客加载的默认视频源排序与启用状态。排在第 1 位的源将作为新访客打开播放页时的
             <strong className="text-[var(--kz-accent)]"> 全局默认视频源</strong>。
-            同时支持为每个视频源添加专属加权的番剧（Bangumi ID），播放对应番剧时权重自动 <strong className="text-amber-400">+20</strong>。
+            同时支持为每个视频源添加专属加权的番剧（Bangumi ID），播放对应番剧时权重自动 <strong className="text-amber-400">+500</strong>。
           </p>
 
           <div className="space-y-2">
@@ -1843,11 +1847,22 @@ function AdminDashboard() {
                         {plugin.name}
                       </span>
                       {renderPluginBadge(plugin)}
+                      {plugin.oldAnimePriority && (
+                        <span
+                          className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-medium text-amber-500 border border-amber-500/20"
+                          title="经典老番场景自动 +15 权重优先"
+                        >
+                          老番优先
+                        </span>
+                      )}
                       {isDefaultTop && (
                         <span className="rounded bg-[var(--kz-accent)]/20 px-1.5 py-0.5 text-[9px] font-bold text-[var(--kz-accent)]">
                           默认首选源
                         </span>
                       )}
+                      <span className="rounded bg-[var(--kz-bg-soft)] px-1.5 py-0.5 font-mono text-[9px] text-[var(--kz-fg-dim)] border border-[var(--kz-border-subtle)]" title="站点当前设定的有效基准权重">
+                        基准分: {getPluginTotalWeight(plugin, { adminWeights: defPluginWeights })}
+                      </span>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -1864,7 +1879,7 @@ function AdminDashboard() {
                             ? 'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20'
                             : 'border-[var(--kz-border)] bg-[var(--kz-bg-soft)] text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)]'
                         }`}
-                        title="配置播放特定番剧时该源增加权重 20"
+                        title="配置播放特定番剧时该源增加权重 500"
                       >
                         🎯 番剧加权{boostedIds.length > 0 ? ` (${boostedIds.length})` : ''}
                       </button>
@@ -1907,7 +1922,7 @@ function AdminDashboard() {
                     <div className="mt-1 pt-2 border-t border-[var(--kz-border)]/50 space-y-2">
                       <div className="flex items-center justify-between text-[11px] text-[var(--kz-fg-muted)]">
                         <span>
-                          添加专属加权的 Bangumi ID（播放这些番剧时权重 <strong className="text-amber-400">+20</strong>）：
+                          添加专属加权的 Bangumi ID（播放这些番剧时权重 <strong className="text-amber-400">+500</strong>）：
                         </span>
                       </div>
                       <div className="flex gap-2">
