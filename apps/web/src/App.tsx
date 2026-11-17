@@ -6,7 +6,7 @@ import { routeImports } from './lib/route-preload'
 import { statsApi } from './lib/api'
 
 const ACTIVE_PING_SESSION_KEY = 'animaku_last_active_ping'
-const ACTIVE_PING_INTERVAL_MS = 1 * 60 * 1000 // 1 分钟冷却与心跳间隔
+const ACTIVE_PING_INTERVAL_MS = 5 * 60 * 1000 // 5 分钟冷却与心跳间隔
 
 function useActiveTelemetry() {
   useEffect(() => {
