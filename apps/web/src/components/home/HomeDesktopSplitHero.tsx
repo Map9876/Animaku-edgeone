@@ -6,17 +6,42 @@ import { DailyScheduleHeroCard } from './DailyScheduleHeroCard'
 interface HomeDesktopSplitHeroProps {
   items: BangumiItem[]
   recommendations?: RecommendItem[]
+  isLoading?: boolean
+  isError?: boolean
+  onRetry?: () => void
 }
 
 export const HomeDesktopSplitHero = memo(function HomeDesktopSplitHero({
   items,
   recommendations,
+  isLoading,
+  isError,
+  onRetry,
 }: HomeDesktopSplitHeroProps) {
   return (
     <div className="flex w-full gap-4 items-start">
       {/* 左侧：精选推荐轮播 Banner（黄金比例 0.382，B 站 1274/884 比例自撑高度） */}
       <div className="w-[38.2%] aspect-[1274/884] shrink-0">
-        <HomeHeroBanner items={items} recommendations={recommendations} />
+        {isLoading && items.length === 0 ? (
+          <div className="kz-skeleton h-full w-full rounded-2xl" />
+        ) : isError && items.length === 0 ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border border-[var(--kz-danger)]/30 bg-[var(--kz-bg-soft)] p-6 text-center">
+            <p className="text-xs font-medium text-[var(--kz-danger)]">
+              推荐内容加载失败
+            </p>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="kz-btn-primary px-3 py-1 text-xs cursor-pointer"
+              >
+                重试
+              </button>
+            )}
+          </div>
+        ) : (
+          <HomeHeroBanner items={items} recommendations={recommendations} />
+        )}
       </div>
 
       {/* 右侧：每日放送 6 宫格矩阵（黄金比例 0.618，16:10.3 双排等高紧凑排布） */}

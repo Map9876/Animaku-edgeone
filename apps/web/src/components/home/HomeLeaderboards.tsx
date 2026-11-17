@@ -82,6 +82,12 @@ function LeaderboardPosterCard({
         </div>
       )}
 
+      {/* 顶部暗色渐变遮罩：确保右上角观看数在亮色封面上清晰易读 */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-10 sm:h-12 bg-gradient-to-b from-black/60 via-black/20 to-transparent"
+        aria-hidden
+      />
+
       {/* 右上角观看数：樱花粉色；手机端紧凑单位 (如 5.6万 次观看)，桌面端显示完整 */}
       <div className="pointer-events-none absolute right-2 top-2 z-10 flex items-center text-pink-200 [text-shadow:0_1px_3px_rgba(0,0,0,0.95)]">
         <span className="text-[11.5px] sm:text-[12.5px] font-medium tabular-nums leading-none">

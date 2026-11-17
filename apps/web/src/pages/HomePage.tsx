@@ -192,27 +192,32 @@ export function HomePage() {
       </h1>
 
       {/* 顶部焦点舞台：移动端保留 3D Cover Flow，桌面端使用分栏黄金排版 */}
-      {dailyRecommend.isLoading && (!recommendations || recommendations.length === 0) ? (
-        <section aria-label="今日推荐加载中">
-          <div className="block lg:hidden">
+      <section aria-label="今日推荐">
+        {/* 移动端 (< 1024px)：100% 保持原有 3D Cover Flow 体验 */}
+        <div className="block lg:hidden">
+          {dailyRecommend.isLoading && (!recommendations || recommendations.length === 0) ? (
             <HeroCoverFlowSkeleton />
-          </div>
-          <div className="hidden lg:block">
-            <HomeDesktopSplitHeroSkeleton />
-          </div>
-        </section>
-      ) : heroItems.length >= 3 ? (
-        <section aria-label="今日推荐">
-          {/* 移动端 (< 1024px)：100% 保持原有 3D Cover Flow 体验 */}
-          <div className="block lg:hidden">
+          ) : heroItems.length >= 3 ? (
             <HeroCoverFlow items={heroItems} recommendations={recommendations} limit={10} />
-          </div>
-          {/* 桌面端 (≥ 1024px)：左侧轮播 Banner + 右侧每日更新 6 宫格矩阵 */}
-          <div className="hidden lg:block">
-            <HomeDesktopSplitHero items={heroItems} recommendations={recommendations} />
-          </div>
-        </section>
-      ) : null}
+          ) : dailyRecommend.isError ? (
+            <ErrorState
+              error={dailyRecommend.error}
+              onRetry={() => dailyRecommend.refetch()}
+            />
+          ) : null}
+        </div>
+
+        {/* 桌面端 (≥ 1024px)：左侧轮播 Banner + 右侧每日更新 6 宫格矩阵 */}
+        <div className="hidden lg:block">
+          <HomeDesktopSplitHero
+            items={heroItems}
+            recommendations={recommendations}
+            isLoading={dailyRecommend.isLoading && heroItems.length === 0}
+            isError={dailyRecommend.isError && heroItems.length === 0}
+            onRetry={() => dailyRecommend.refetch()}
+          />
+        </div>
+      </section>
 
       {/* 运营展位：历史播放模块上方 (支持单通栏长条或双半屏并排) */}
       <SiteHighlightBanner placement="home_above_history" />

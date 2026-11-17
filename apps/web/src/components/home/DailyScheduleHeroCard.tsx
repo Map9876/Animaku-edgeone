@@ -111,6 +111,12 @@ const CompactGridCard = memo(function CompactGridCard({
         </div>
       )}
 
+      {/* 顶部暗色渐变遮罩：确保右上角热度指标在亮色封面上清晰易读 */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-black/60 via-black/20 to-transparent"
+        aria-hidden
+      />
+
       {/* 右上角热度指标（空心纯轮廓火焰图标 + 间隙 + 放大版 13.5px 热度字号 + 抗干扰阴影） */}
       {heatText && (
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.95)]">
@@ -159,6 +165,12 @@ const CompactHighlightCard = memo(function CompactHighlightCard({
           {item.title}
         </div>
       )}
+
+      {/* 顶部暗色渐变遮罩：确保角标在亮色封面上清晰易读 */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-black/60 via-black/20 to-transparent"
+        aria-hidden
+      />
 
       {/* 顶部胶囊角标 (取代原番剧金色星级，可手动删除) */}
       {item.badge && (
@@ -269,6 +281,19 @@ export const DailyScheduleHeroCard = memo(function DailyScheduleHeroCard() {
               />
             ))}
           </div>
+        ) : calendarQuery.isError ? (
+          <div className="flex min-h-[160px] aspect-[16/10.5] sm:aspect-[16/7.5] w-full flex-col items-center justify-center gap-3 rounded-xl border border-[var(--kz-danger)]/30 bg-[var(--kz-bg-soft)] p-6 text-center">
+            <p className="text-xs font-medium text-[var(--kz-danger)]">
+              今日放送时间表加载失败
+            </p>
+            <button
+              type="button"
+              onClick={() => calendarQuery.refetch()}
+              className="kz-btn-primary px-3 py-1 text-xs cursor-pointer"
+            >
+              重试
+            </button>
+          </div>
         ) : currentDayItems.length === 0 ? (
           <div className="flex aspect-[16/10.3] w-full items-center justify-center rounded-xl border border-[var(--kz-border)]/50 bg-[var(--kz-bg-soft)] text-xs text-[var(--kz-fg-dim)]">
             当天暂无新番播出
@@ -296,25 +321,27 @@ export const DailyScheduleHeroCard = memo(function DailyScheduleHeroCard() {
       </div>
 
       {/* 右侧空白边缘操作区：B 站原生同款“换一换”按钮 */}
-      <div className="absolute left-[calc(100%+12px)] top-0 z-20 flex flex-col items-center">
-        <button
-          type="button"
-          onClick={handleNextPage}
-          title="换一换"
-          aria-label="换一换"
-          className="group relative flex w-10 flex-col items-center justify-center gap-1 rounded-lg border border-[var(--kz-border)] bg-[var(--kz-bg-elevated)] py-2.5 text-[var(--kz-fg-base)] shadow-xs transition-all duration-200 hover:border-[var(--kz-accent)] hover:bg-[var(--kz-bg-hover)] hover:text-[var(--kz-accent)] hover:shadow-sm active:scale-95 cursor-pointer"
-        >
-          <RotateCwIcon
-            className="h-4 w-4 shrink-0 transition-transform duration-500 ease-out"
-            style={{ transform: `rotate(${rotationCount * 360}deg)` }}
-          />
-          <span className="flex flex-col items-center text-[13px] leading-[15px] select-none">
-            <span>换</span>
-            <span>一</span>
-            <span>换</span>
-          </span>
-        </button>
-      </div>
+      {currentDayItems.length > 0 && (
+        <div className="absolute left-[calc(100%+12px)] top-0 z-20 flex flex-col items-center">
+          <button
+            type="button"
+            onClick={handleNextPage}
+            title="换一换"
+            aria-label="换一换"
+            className="group relative flex w-10 flex-col items-center justify-center gap-1 rounded-lg border border-[var(--kz-border)] bg-[var(--kz-bg-elevated)] py-2.5 text-[var(--kz-fg-base)] shadow-xs transition-all duration-200 hover:border-[var(--kz-accent)] hover:bg-[var(--kz-bg-hover)] hover:text-[var(--kz-accent)] hover:shadow-sm active:scale-95 cursor-pointer"
+          >
+            <RotateCwIcon
+              className="h-4 w-4 shrink-0 transition-transform duration-500 ease-out"
+              style={{ transform: `rotate(${rotationCount * 360}deg)` }}
+            />
+            <span className="flex flex-col items-center text-[13px] leading-[15px] select-none">
+              <span>换</span>
+              <span>一</span>
+              <span>换</span>
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   )
 })
