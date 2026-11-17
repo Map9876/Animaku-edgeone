@@ -186,6 +186,16 @@ export function parseSourceProxyMap(env: NodeJS.ProcessEnv = process.env): Recor
   return map
 }
 
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent'
+
+function resolveLogLevel(): LogLevel {
+  const raw = (process.env.LOG_LEVEL || 'info').trim().toLowerCase()
+  if (['debug', 'info', 'warn', 'error', 'silent'].includes(raw)) {
+    return raw as LogLevel
+  }
+  return 'info'
+}
+
 const dataDir = resolveDataDir()
 const appVersion = resolveAppVersion()
 const cleanVersion = appVersion.replace(/^v/, '')
@@ -291,6 +301,10 @@ export const config = {
   siteUrl: (process.env.SITE_URL || process.env.PUBLIC_SITE_URL || '')
     .trim()
     .replace(/\/+$/, ''),
+  /**
+   * Server log filtering level: 'debug' | 'info' (default) | 'warn' | 'error' | 'silent'
+   */
+  logLevel: resolveLogLevel(),
   /**
    * Server access log output format: 'pretty' (default human-friendly) | 'json' (structured JSONL for ELK/Loki)
    */

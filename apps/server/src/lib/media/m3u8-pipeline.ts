@@ -21,8 +21,6 @@ export interface RewriteOpts {
   hasMediaAuth?: boolean
   /** 是否开启切片广告过滤 */
   adFilter?: boolean
-  /** 是否强制全量媒体分片代理 */
-  fullProxy?: boolean
   /** 是否强制代理该 URI（用于 KEY / MAP 等小体积受限资源） */
   alwaysProxy?: boolean
 }
@@ -113,7 +111,7 @@ export async function readTextLimited(
 
 /**
  * 改写播放列表中单条 URI：
- * - 默认 / fullProxy / cookie 场景：所有公共 URI 改写为 `/api/media/proxy`；
+ * - cookie 鉴权场景：公共 URI 改写为 `/api/media/proxy`；
  * - 混合模式 (hybrid)：仅嵌套的 .m3u8 走代理过滤，.ts / .m4s 视频切片直连 CDN 降低服务端带宽压力。
  */
 export function rewriteM3u8Uri(u: string, base: URL, opts: RewriteOpts): string {
@@ -124,7 +122,6 @@ export function rewriteM3u8Uri(u: string, base: URL, opts: RewriteOpts): string 
   }
 
   const adFilter = Boolean(opts.adFilter)
-  const fullProxy = Boolean(opts.fullProxy)
   const cookie = opts.cookie || ''
   const token = opts.token || ''
   const playlist = isM3u8Path(abs)
@@ -132,7 +129,7 @@ export function rewriteM3u8Uri(u: string, base: URL, opts: RewriteOpts): string 
   // 混合广告过滤或无授权场景：客户端直连 CDN 拉取媒体分片
   if (
     !opts.hasMediaAuth ||
-    (adFilter && !cookie && !fullProxy && !playlist && !opts.alwaysProxy)
+    (adFilter && !cookie && !playlist && !opts.alwaysProxy)
   ) {
     if (!playlist) {
       return abs.toString()
@@ -146,7 +143,6 @@ export function rewriteM3u8Uri(u: string, base: URL, opts: RewriteOpts): string 
 
   if (cookie) q.set('cookie', cookie)
   if (token) q.set('token', token)
-  if (fullProxy) q.set('fullProxy', '1')
   // 嵌套 M3U8 子列表保持 adFilter 标志传递
   if (adFilter && playlist) {
     q.set('adFilter', '1')
@@ -167,7 +163,7 @@ export function rewriteExtUriAttrs(
     try {
       const proxied = rewriteM3u8Uri(u, base, {
         ...opts,
-        alwaysProxy: Boolean(opts.hasMediaAuth && (opts.token || opts.fullProxy)),
+        alwaysProxy: Boolean(opts.hasMediaAuth && opts.token),
       })
       return `URI=${quote}${proxied}${quote}`
     } catch {

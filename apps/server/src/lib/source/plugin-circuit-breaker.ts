@@ -65,6 +65,7 @@ class PluginCircuitBreaker {
       }
       // 成功抢占唯一的半开探活名额
       state.halfOpenProbing = true
+      console.log(`[circuit-breaker] 源站 [${key}] 冷却期满，放行单飞请求进行探活测试`)
       return { allowed: true }
     }
 
@@ -76,6 +77,10 @@ class PluginCircuitBreaker {
    */
   recordSuccess(pluginName: string): void {
     const key = this.normalizeKey(pluginName)
+    const state = this.states.get(key)
+    if (state && (state.trippedUntil > 0 || state.failureCount > 0)) {
+      console.log(`[circuit-breaker] 源站 [${key}] 探活/访问成功，熔断已解除，恢复正常服务`)
+    }
     this.states.delete(key)
   }
 
@@ -109,6 +114,9 @@ class PluginCircuitBreaker {
       state.lastFailureTime = now
       state.failureCount++
       this.states.set(key, state)
+      console.warn(
+        `[circuit-breaker] 源站 [${key}] 半开探活失败，重新进入熔断冷却 (${BREAKER_CONFIG.COOLDOWN_MS / 1000}s): ${errorMsg}`,
+      )
       return
     }
 
@@ -125,6 +133,10 @@ class PluginCircuitBreaker {
     if (shouldTrip) {
       state.trippedUntil = now + BREAKER_CONFIG.COOLDOWN_MS
       state.halfOpenProbing = false
+      const reason = isHard ? '网络硬故障 (连接拒绝/DNS解析失败)' : `连续 ${state.failureCount} 次超时`
+      console.warn(
+        `[circuit-breaker] 源站 [${key}] ${reason}，触发熔断保护，进入冷却 (${BREAKER_CONFIG.COOLDOWN_MS / 1000}s)`,
+      )
     }
 
     this.states.set(key, state)

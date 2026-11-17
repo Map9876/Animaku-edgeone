@@ -39,7 +39,7 @@ test('m3u8-pipeline: readTextLimited enforces byte bounds', async () => {
   )
 })
 
-test('m3u8-pipeline: rewriteM3u8Uri correctly routes hybrid vs full proxy', () => {
+test('m3u8-pipeline: rewriteM3u8Uri correctly routes hybrid vs auth proxy', () => {
   const base = new URL('https://origin.cdn.com/live/hls/master.m3u8')
 
   // Hybrid ad-filter mode: .ts segments remain direct on CDN
@@ -48,7 +48,6 @@ test('m3u8-pipeline: rewriteM3u8Uri correctly routes hybrid vs full proxy', () =
     cookie: '',
     hasMediaAuth: true,
     adFilter: true,
-    fullProxy: false,
   })
   assert.equal(hybridTs, 'https://origin.cdn.com/live/hls/seg001.ts')
 
@@ -58,23 +57,20 @@ test('m3u8-pipeline: rewriteM3u8Uri correctly routes hybrid vs full proxy', () =
     cookie: '',
     hasMediaAuth: true,
     adFilter: true,
-    fullProxy: false,
   })
   assert.match(hybridSublist, /^\/api\/media\/proxy\?/)
   assert.match(hybridSublist, /adFilter=1/)
   assert.match(hybridSublist, /sublist_1080p\.m3u8/)
 
-  // Full proxy mode: .ts segments route through proxy
+  // Auth proxy mode (with cookie / token): .ts segments route through proxy
   const fullTs = rewriteM3u8Uri('seg001.ts', base, {
     referer: 'https://origin.cdn.com/',
     cookie: 'session=abc',
     token: 'admin-key',
     hasMediaAuth: true,
     adFilter: false,
-    fullProxy: true,
   })
   assert.match(fullTs, /^\/api\/media\/proxy\?/)
-  assert.match(fullTs, /fullProxy=1/)
   assert.match(fullTs, /token=admin-key/)
   assert.match(fullTs, /cookie=session%3Dabc/)
 
@@ -95,7 +91,6 @@ test('m3u8-pipeline: rewriteExtUriAttrs rewrites KEY/MAP URI tags', () => {
     cookie: '',
     token: 'my-tok',
     hasMediaAuth: true,
-    fullProxy: true,
   })
   assert.match(rewritten, /#EXT-X-KEY:METHOD=AES-128,URI="\/api\/media\/proxy\?/)
   assert.match(rewritten, /key\.php%3Fid%3D123/)

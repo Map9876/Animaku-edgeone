@@ -18,25 +18,23 @@ test('pickPlaybackSrc: ticket stream appends adFilter=1 on /stream when forceAdF
   assert.equal(res.transit, 'playlist-proxy')
 })
 
-test('pickPlaybackSrc: ticket stream appends stream=1 when forceProxy=true and sets full-proxy transit', () => {
+test('pickPlaybackSrc: ticket stream on /stream defaults to playlist-proxy transit', () => {
   const res = pickPlaybackSrc({
     proxyUrl: '/api/media/stream?t=ticket123',
-    forceProxy: true,
   })
 
   assert.equal(res.mode, 'proxy')
-  assert.equal(res.src.includes('stream=1'), true)
-  assert.equal(res.transit, 'full-proxy')
+  assert.equal(res.src.includes('t=ticket123'), true)
+  assert.equal(res.transit, 'playlist-proxy')
 })
 
-test('pickPlaybackSrc: ticket stream on /segment with forceProxy appends stream=1', () => {
+test('pickPlaybackSrc: ticket stream on /segment defaults to full-proxy transit for direct segment/auth', () => {
   const res = pickPlaybackSrc({
     proxyUrl: '/api/media/segment?t=ticket_mp4',
-    forceProxy: true,
   })
 
   assert.equal(res.mode, 'proxy')
-  assert.equal(res.src.includes('stream=1'), true)
+  assert.equal(res.src.includes('t=ticket_mp4'), true)
   assert.equal(res.transit, 'full-proxy')
 })
 

@@ -1,5 +1,6 @@
+import { randomBytes } from 'node:crypto'
 import type { MiddlewareHandler } from 'hono'
-import { config } from '../config'
+import { config, type LogLevel } from '../config'
 
 // ==========================================
 // 1. Types & Interfaces
@@ -17,6 +18,7 @@ export interface ParsedClientDevice {
 
 export interface StructuredLogRecord {
   time: string
+  reqId?: string
   level: 'info' | 'warn' | 'error'
   ip: string
   country?: string
@@ -34,6 +36,40 @@ export interface StructuredLogRecord {
   durationMs: number
   bytes?: number
   error?: string
+}
+
+const CLIENT_REQ_ID_REGEX = /^[A-Za-z0-9_-]{8,64}$/
+
+/**
+ * 校验并解析 Request ID：
+ * 严格只接受符合 ^[A-Za-z0-9_-]{8,64}$ 的客户端请求头，防止换行符/超长等 CRLF 日志注入攻击；
+ * 若未提供或不合规，则由服务端自动生成 8 位纯 hex 短随机 ID。
+ */
+export function resolveRequestId(incoming?: string): string {
+  if (incoming) {
+    const trimmed = incoming.trim()
+    if (CLIENT_REQ_ID_REGEX.test(trimmed)) {
+      return trimmed
+    }
+  }
+  return randomBytes(4).toString('hex')
+}
+
+const LOG_LEVEL_WEIGHT: Record<LogLevel, number> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+  silent: 99,
+}
+
+export function isLogLevelEnabled(
+  level: 'debug' | 'info' | 'warn' | 'error',
+  currentLevel: LogLevel = config.logLevel,
+): boolean {
+  const currentWeight = LOG_LEVEL_WEIGHT[currentLevel] ?? 20
+  const targetWeight = LOG_LEVEL_WEIGHT[level] ?? 20
+  return targetWeight >= currentWeight
 }
 
 // ==========================================
@@ -524,6 +560,7 @@ function formatPrettyParams(params?: Record<string, unknown>): string {
 
 export function formatPrettyLog(record: StructuredLogRecord): string {
   const timeStr = `[${record.time}]`
+  const reqIdStr = record.reqId ? ` ${ANSI.gray}[${record.reqId}]${ANSI.reset}` : ''
   const levelStr = colorLevel(record.level)
   const ipStr = `${ANSI.gray}[${record.ip}]${ANSI.reset}`
   const countryStr = record.country ? ` ${ANSI.blue}[${record.country}]${ANSI.reset}` : ''
@@ -555,7 +592,7 @@ export function formatPrettyLog(record: StructuredLogRecord): string {
   const perfStr = `(${durationStr}${sizeStr})`
   const errStr = record.error ? ` ${ANSI.red}- "${record.error}"${ANSI.reset}` : ''
 
-  return `${timeStr} ${levelStr} ${ipStr}${countryStr} ${deviceStr} ${methodStr} ${pathStr}${paramsStr}${cacheStr} -> ${statusStr} ${perfStr}${errStr}`
+  return `${timeStr}${reqIdStr} ${levelStr} ${ipStr}${countryStr} ${deviceStr} ${methodStr} ${pathStr}${paramsStr}${cacheStr} -> ${statusStr} ${perfStr}${errStr}`
 }
 
 export function formatJsonLog(record: StructuredLogRecord): string {
@@ -588,8 +625,14 @@ export function accessLogger(): MiddlewareHandler {
     const path = c.req.path
     const method = c.req.method
     const ip = getClientIp(c.req)
+    const reqId = resolveRequestId(c.req.header('x-request-id'))
     const isMediaProxy = path.startsWith('/api/media/proxy')
     const isHealthCheck = path === '/api/health' || path === '/api/health/'
+    const isPingCheck =
+      path === '/api/stats/ping' ||
+      path === '/api/stats/ping/' ||
+      path === '/api/stats/active' ||
+      path === '/api/stats/active/'
     const isStaticAsset = isStaticAssetPath(path)
 
     const ua = c.req.header('user-agent')
@@ -622,8 +665,22 @@ export function accessLogger(): MiddlewareHandler {
       const elapsed = Date.now() - start
       const status = c.res ? c.res.status : caughtError ? 500 : 200
 
+      // Echo sanitized/generated Request-ID to response headers
+      if (c.res) {
+        try {
+          c.res.headers.set('x-request-id', reqId)
+        } catch {
+          // ignore if headers already sealed
+        }
+      }
+
       // Silent health check on success (filter Docker/K8s polling)
       if (isHealthCheck && status === 200) {
+        return
+      }
+
+      // Silent heartbeat / stats ping on success (< 400)
+      if (isPingCheck && status < 400) {
         return
       }
 
@@ -644,6 +701,11 @@ export function accessLogger(): MiddlewareHandler {
       const level: 'info' | 'warn' | 'error' =
         status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info'
 
+      // Filter by LOG_LEVEL
+      if (!isLogLevelEnabled(level)) {
+        return
+      }
+
       // Extract cache header (e.g. X-Cache: HIT / MISS)
       const xCacheHeader = c.res?.headers.get('x-cache')?.toUpperCase()
       let cacheStatus: StructuredLogRecord['cache'] = 'NONE'
@@ -661,6 +723,7 @@ export function accessLogger(): MiddlewareHandler {
 
       const record: StructuredLogRecord = {
         time: timeStr,
+        reqId,
         level,
         ip,
         country,
