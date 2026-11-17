@@ -16,26 +16,33 @@ export function BackToTopMascot() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isScrolling, setIsScrolling] = useState(false)
 
+  const isVisibleRef = useRef(false)
+  const isScrollingRef = useRef(false)
   const scrollTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const handleScroll = () => {
       const currentY = window.scrollY
       // 迟滞防抖：向下超过 240px 探出，回滚到顶部 50px 以内平稳收回
-      setIsVisible((prev) => {
-        if (currentY > 240) return true
-        if (currentY < 50) return false
-        return prev
-      })
+      const nextVisible = currentY > 240 ? true : currentY < 50 ? false : isVisibleRef.current
 
-      // 仅在当前未处于滚动状态时才触发一次锁定，避免滚动期间连续触发 React 渲染
-      setIsScrolling((scrolling) => (scrolling ? scrolling : true))
+      // 使用 ref 严格守卫，仅在状态真正发生跃变时才调用 setState，避免高频滚动产生任何微小调度开销
+      if (nextVisible !== isVisibleRef.current) {
+        isVisibleRef.current = nextVisible
+        setIsVisible(nextVisible)
+      }
+
+      if (!isScrollingRef.current) {
+        isScrollingRef.current = true
+        setIsScrolling(true)
+      }
 
       if (scrollTimerRef.current) {
         window.clearTimeout(scrollTimerRef.current)
       }
       // 滚动停止 100ms 后恢复交互
       scrollTimerRef.current = window.setTimeout(() => {
+        isScrollingRef.current = false
         setIsScrolling(false)
       }, 100)
     }
@@ -70,7 +77,8 @@ export function BackToTopMascot() {
   return (
     <div
       role="button"
-      tabIndex={0}
+      tabIndex={isVisible ? 0 : -1}
+      aria-hidden={!isVisible}
       aria-label="回到顶部"
       onClick={scrollToTop}
       onKeyDown={(e) => {
