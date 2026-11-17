@@ -6,22 +6,33 @@ import { routeImports } from './lib/route-preload'
 import { statsApi } from './lib/api'
 
 const ACTIVE_PING_SESSION_KEY = 'animaku_last_active_ping'
-const ACTIVE_PING_INTERVAL_MS = 30 * 60 * 1000 // 30 分钟去重
+const ACTIVE_PING_INTERVAL_MS = 1 * 60 * 1000 // 1 分钟冷却与心跳间隔
 
 function useActiveTelemetry() {
   useEffect(() => {
-    try {
-      const now = Date.now()
-      const stored = sessionStorage.getItem(ACTIVE_PING_SESSION_KEY)
-      const lastPing = stored ? Number(stored) : 0
-      if (!lastPing || now - lastPing > ACTIVE_PING_INTERVAL_MS) {
-        sessionStorage.setItem(ACTIVE_PING_SESSION_KEY, String(now))
+    const sendPing = () => {
+      try {
+        const now = Date.now()
+        const stored = sessionStorage.getItem(ACTIVE_PING_SESSION_KEY)
+        const lastPing = stored ? Number(stored) : 0
+        if (!lastPing || now - lastPing >= ACTIVE_PING_INTERVAL_MS) {
+          sessionStorage.setItem(ACTIVE_PING_SESSION_KEY, String(now))
+          void statsApi.pingActive().catch(() => {})
+        }
+      } catch {
+        // 兼容私密浏览限制 sessionStorage 的场景
         void statsApi.pingActive().catch(() => {})
       }
-    } catch {
-      // 兼容私密浏览限制 sessionStorage 的场景
-      void statsApi.pingActive().catch(() => {})
     }
+
+    sendPing()
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        sendPing()
+      }
+    }, ACTIVE_PING_INTERVAL_MS)
+
+    return () => clearInterval(timer)
   }, [])
 }
 

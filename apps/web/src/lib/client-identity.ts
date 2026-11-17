@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'animaku_device_id'
+const DEVICE_ID_REGEX = /^dev_[0-9a-fA-F]{32}$/
 
 let memoryDeviceId: string | null = null
 
@@ -20,14 +21,15 @@ function generateDeviceId(): string {
 /**
  * Get or initialize persistent client device identifier.
  * Cached in memory for 0ms synchronous access.
+ * Automatically validates and heals legacy or malformed IDs.
  */
 export function getDeviceId(): string {
-  if (memoryDeviceId) return memoryDeviceId
+  if (memoryDeviceId && DEVICE_ID_REGEX.test(memoryDeviceId)) return memoryDeviceId
 
   try {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored && stored.trim()) {
+      if (stored && DEVICE_ID_REGEX.test(stored.trim())) {
         memoryDeviceId = stored.trim()
         return memoryDeviceId
       }
@@ -41,7 +43,7 @@ export function getDeviceId(): string {
     /* private browsing or localStorage blocked */
   }
 
-  if (!memoryDeviceId) {
+  if (!memoryDeviceId || !DEVICE_ID_REGEX.test(memoryDeviceId)) {
     memoryDeviceId = generateDeviceId()
   }
   return memoryDeviceId

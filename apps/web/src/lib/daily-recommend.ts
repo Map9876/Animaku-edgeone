@@ -12,15 +12,14 @@ import { useHistoryStore } from '../stores/history'
 import { useWatchedStore } from '../stores/watched'
 import { useSettingsStore } from '../stores/settings'
 import { useAuthStore } from '../stores/auth'
-import { getCachedBrowserFingerprint } from './fingerprint'
+import { getDeviceId } from './client-identity'
 
 const TAG_TOTALS_STORAGE_KEY = 'aniku:bgm:tag_totals'
-const DEVICE_ID_STORAGE_KEY = 'animaku_device_id'
 
 /**
  * 获取或创建稳定的设备机器码 / 用户标识（对齐 zakoway getOrCreateDeviceInstallId）：
  * 1. 若用户已登录（Bangumi 或自建用户系统），优先使用 user_${userId}，保证同一账号跨设备推荐绝对一致；
- * 2. 若未登录，优先读取持久化的设备机器码；不存在时尝试读取浏览器硬件指纹或生成唯一随机设备码。
+ * 2. 若未登录，统一复用合规设备机器码（dev_[0-9a-fA-F]{32}）。
  */
 export function getOrCreateDeviceId(): string {
   if (typeof window === 'undefined') return 'device_server_fallback'
@@ -32,22 +31,7 @@ export function getOrCreateDeviceId(): string {
   }
 
   // 2. 本地持久化机器码
-  try {
-    const existing = localStorage.getItem(DEVICE_ID_STORAGE_KEY)
-    if (existing && existing.trim().length > 0) {
-      return existing.trim()
-    }
-
-    const fp = getCachedBrowserFingerprint()
-    const newId = fp && fp.length >= 16
-      ? `fp_${fp}`
-      : `dev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
-
-    localStorage.setItem(DEVICE_ID_STORAGE_KEY, newId)
-    return newId
-  } catch {
-    return 'device_default_seed'
-  }
+  return getDeviceId()
 }
 
 /**
