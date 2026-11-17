@@ -125,7 +125,7 @@ export const BangumiCard = memo(function BangumiCard({
       transition={{ duration: 0.22, ease: 'easeOut' }}
       className="bangumi-card group flex flex-col overflow-hidden rounded-2xl bg-transparent"
     >
-      <div className="bangumi-card-cover relative aspect-[3/4] overflow-hidden rounded-2xl bg-[var(--kz-bg-soft)] shadow-[0_10px_28px_rgba(0,0,0,0.18)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.4)] ring-1 ring-[var(--kz-border)] dark:ring-white/10">
+      <div className="bangumi-card-cover relative aspect-[3/4] overflow-hidden rounded-2xl bg-[var(--kz-bg-soft)] shadow-[0_8px_20px_rgba(0,0,0,0.18)] dark:shadow-[0_10px_24px_rgba(0,0,0,0.4)] ring-1 ring-[var(--kz-border)] dark:ring-white/10 [isolation:isolate] [transform:translateZ(0)]">
         {!isLoaded && !isLcp && (
           <div
             className="kz-skeleton absolute inset-0 z-0 rounded-[inherit]"
@@ -187,7 +187,7 @@ export const BangumiCard = memo(function BangumiCard({
         />
         {/* bottom-left stats: 红色空心线框火焰 + 13.5px font-medium 红色热度数值 + 立体暗影 */}
         {heatText && (
-          <span className="absolute bottom-1.5 left-2.5 flex max-w-[60%] items-center gap-1.5 truncate drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+          <span className="absolute bottom-1.5 left-2.5 flex max-w-[60%] items-center gap-1.5 truncate [text-shadow:0_1px_3px_rgba(0,0,0,0.95)]">
             <HotFireIcon className="h-4 w-4 shrink-0 text-rose-300" />
             <span className="text-[13.5px] font-medium tabular-nums leading-none text-rose-300">
               {heatText}

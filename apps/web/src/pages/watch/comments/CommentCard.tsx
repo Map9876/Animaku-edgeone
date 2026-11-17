@@ -80,7 +80,12 @@ function BiliStarRating({ rate }: { rate: number }) {
 
 function formatRelativeTime(dateStr: string): string {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
+  // 兼顾 Safari / WebKit：Safari 遇到空格分隔的 "YYYY-MM-DD HH:mm:ss" 会解析为 Invalid Date
+  const normalizedStr =
+    dateStr.includes(' ') && !dateStr.includes('T')
+      ? dateStr.replace(' ', 'T')
+      : dateStr
+  const d = new Date(normalizedStr)
   if (Number.isNaN(d.getTime())) return dateStr
 
   const now = Date.now()

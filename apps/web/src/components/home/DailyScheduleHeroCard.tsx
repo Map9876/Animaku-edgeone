@@ -94,7 +94,7 @@ const CompactGridCard = memo(function CompactGridCard({
         preloadRoute('subject')
         preloadVideoPlayer()
       }}
-      className="group relative block aspect-[16/10.3] w-full overflow-hidden rounded-xl border border-[var(--kz-border)]/60 bg-[var(--kz-bg-soft)] transition-all duration-300 hover:border-[var(--kz-accent)]/60 hover:shadow-md"
+      className="group relative block aspect-[16/10.3] w-full overflow-hidden rounded-xl border border-[var(--kz-border)]/60 bg-[var(--kz-bg-soft)] transition-all duration-300 hover:border-[var(--kz-accent)]/60 hover:shadow-md [isolation:isolate] [transform:translateZ(0)]"
     >
       {/* 封面图片 */}
       {coverUrl ? (
@@ -113,7 +113,7 @@ const CompactGridCard = memo(function CompactGridCard({
 
       {/* 右上角热度指标（空心纯轮廓火焰图标 + 间隙 + 放大版 13.5px 热度字号 + 抗干扰阴影） */}
       {heatText && (
-        <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+        <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5 text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.95)]">
           <HotFireIcon className="h-4 w-4 shrink-0" />
           <span className="text-[13.5px] font-medium tabular-nums leading-none">{heatText}</span>
         </div>
@@ -124,7 +124,7 @@ const CompactGridCard = memo(function CompactGridCard({
 
       {/* 底部中文标题：斗鱼同款 14px 常规体字体 */}
       <div className="absolute inset-x-0 bottom-0 p-1.5 z-10">
-        <p className="truncate text-[14px] font-normal text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]" title={title}>
+        <p className="truncate text-[14px] font-normal text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]" title={title}>
           {title}
         </p>
       </div>
@@ -143,7 +143,7 @@ const CompactHighlightCard = memo(function CompactHighlightCard({
       target={item.target || '_blank'}
       rel="noopener noreferrer sponsored"
       title={item.title}
-      className="group relative block aspect-[16/10.3] w-full overflow-hidden rounded-xl border border-[var(--kz-border)]/60 bg-[var(--kz-bg-soft)] transition-all duration-300 hover:border-[var(--kz-accent)]/60 hover:shadow-md"
+      className="group relative block aspect-[16/10.3] w-full overflow-hidden rounded-xl border border-[var(--kz-border)]/60 bg-[var(--kz-bg-soft)] transition-all duration-300 hover:border-[var(--kz-accent)]/60 hover:shadow-md [isolation:isolate] [transform:translateZ(0)]"
     >
       {/* 满幅图片铺满，与番剧卡片清晰区隔 */}
       {item.imageUrl ? (
@@ -174,7 +174,7 @@ const CompactHighlightCard = memo(function CompactHighlightCard({
         <>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-1.5 z-10">
-            <p className="truncate text-[14px] font-normal text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]" title={item.title}>
+            <p className="truncate text-[14px] font-normal text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]" title={item.title}>
               {item.title}
             </p>
           </div>

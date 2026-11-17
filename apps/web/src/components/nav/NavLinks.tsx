@@ -89,7 +89,7 @@ export function NavLinks() {
             onTouchStart={() => onWarmup(link.to)}
             className={clsx(
               'group relative flex h-full items-center justify-center px-2 sm:px-3 text-[14.5px] sm:text-[15.5px] font-medium tracking-wide transition-colors duration-150 select-none cursor-pointer',
-              'drop-shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]',
+              '[text-shadow:0_1px_2px_rgba(0,0,0,0.12)] dark:[text-shadow:0_1px_2px_rgba(0,0,0,0.5)]',
               isActive
                 ? 'text-[var(--kz-accent)]'
                 : 'text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)]',
@@ -120,7 +120,7 @@ export function NavLinks() {
             rel="noopener noreferrer sponsored"
             className={clsx(
               'group relative inline-flex h-full items-center gap-1.5 px-2.5 sm:px-3 text-[14px] sm:text-[15px] font-medium tracking-wide transition-all duration-150',
-              'drop-shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]',
+              '[text-shadow:0_1px_2px_rgba(0,0,0,0.12)] dark:[text-shadow:0_1px_2px_rgba(0,0,0,0.5)]',
               link.highlight
                 ? 'text-[var(--kz-accent)]'
                 : 'text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)]',
@@ -153,7 +153,7 @@ export function NavLinks() {
             type="button"
             className={clsx(
               'group relative flex h-full items-center gap-0.5 px-1.5 text-[14px] font-medium tracking-wide transition-colors duration-150 select-none cursor-pointer',
-              'drop-shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]',
+              '[text-shadow:0_1px_2px_rgba(0,0,0,0.12)] dark:[text-shadow:0_1px_2px_rgba(0,0,0,0.5)]',
               menuOpen
                 ? 'text-[var(--kz-accent)]'
                 : 'text-[var(--kz-fg-muted)] hover:text-[var(--kz-fg)]',

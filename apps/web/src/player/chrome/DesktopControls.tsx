@@ -126,6 +126,70 @@ export function DesktopControls(props: PlayerControlsProps) {
     }
   }, [settingsMenuOpen])
 
+  // ─── 浮层 DOM 引用（用于触发器排除与优雅点击外部关闭） ───
+  const settingsBtnRef = useRef<HTMLButtonElement>(null)
+  const settingsPopoverRef = useRef<HTMLDivElement>(null)
+  const speedBtnRef = useRef<HTMLButtonElement>(null)
+  const speedMenuRef = useRef<HTMLDivElement>(null)
+  const opedBtnRef = useRef<HTMLButtonElement>(null)
+  const opedWrapRef = useRef<HTMLDivElement>(null)
+
+  // 浮层点击外部优雅关闭（严格排除触发按钮，根除“关了又开”死循环）
+  useEffect(() => {
+    if (!settingsMenuOpen && !speedMenuOpen && !opedDrawerOpen) return
+
+    const handleOutsideClick = (e: MouseEvent | PointerEvent) => {
+      const target = e.target as HTMLElement | null
+      if (!target) return
+
+      // 1. 设置菜单排除与关闭
+      if (settingsMenuOpen) {
+        if (
+          !settingsPopoverRef.current?.contains(target) &&
+          !settingsBtnRef.current?.contains(target)
+        ) {
+          onToggleSettingsMenu?.()
+        }
+      }
+
+      // 2. 倍速菜单排除与关闭
+      if (speedMenuOpen) {
+        if (
+          !speedMenuRef.current?.contains(target) &&
+          !speedBtnRef.current?.contains(target)
+        ) {
+          onToggleSpeedMenu?.()
+        }
+      }
+
+      // 3. OP/ED 抽屉排除与关闭
+      if (opedDrawerOpen) {
+        if (
+          !opedWrapRef.current?.contains(target) &&
+          !opedBtnRef.current?.contains(target)
+        ) {
+          onToggleOpedDrawer?.()
+        }
+      }
+    }
+
+    const timer = setTimeout(() => {
+      window.addEventListener('pointerdown', handleOutsideClick)
+    }, 10)
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('pointerdown', handleOutsideClick)
+    }
+  }, [
+    settingsMenuOpen,
+    speedMenuOpen,
+    opedDrawerOpen,
+    onToggleSettingsMenu,
+    onToggleSpeedMenu,
+    onToggleOpedDrawer,
+  ])
+
   // OP / ED chapter markers — only active when bangumi-oped is enabled and valid timestamps exist
   // 若当前视频源时长与 Bangumi 官方单集时长绝对误差超过容差 (4s)，说明该源可能存在广告或剪辑错位，不渲染 OP/ED 高亮标尺
   const isDurationMismatched =
@@ -477,16 +541,21 @@ export function DesktopControls(props: PlayerControlsProps) {
           {/* Quick Speed Menu */}
           <div className="kz-speed-wrap">
             <button
+              ref={speedBtnRef}
               type="button"
               className="kz-ctrl kz-speed-btn"
               data-active={Math.abs((player.speed || 1) - 1) > 0.01}
-              onClick={onToggleSpeedMenu}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleSpeedMenu?.()
+              }}
               title={`播放倍速（当前 ${player.speed || 1}x）`}
             >
               {formatSpeedMenuLabel(player.speed || 1)}
             </button>
             {speedMenuOpen && (
               <div
+                ref={speedMenuRef}
                 className="kz-speed-menu"
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
@@ -558,12 +627,16 @@ export function DesktopControls(props: PlayerControlsProps) {
 
           {/* OP/ED Marker Assistant */}
           {hasOpedDrawer && (
-            <div className="kz-speed-wrap kz-oped-wrap">
+            <div ref={opedWrapRef} className="kz-speed-wrap kz-oped-wrap">
               <button
+                ref={opedBtnRef}
                 type="button"
                 className="kz-ctrl kz-ctrl-icon"
                 data-active={opedDrawerOpen}
-                onClick={onToggleOpedDrawer}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleOpedDrawer?.()
+                }}
                 title="OP/ED 标记助手"
                 aria-label="OP/ED 标记助手"
               >
@@ -576,10 +649,14 @@ export function DesktopControls(props: PlayerControlsProps) {
           {/* Unified Player Settings Menu */}
           <div className="kz-speed-wrap">
             <button
+              ref={settingsBtnRef}
               type="button"
               className="kz-ctrl kz-ctrl-icon"
               data-active={settingsMenuOpen}
-              onClick={onToggleSettingsMenu}
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleSettingsMenu?.()
+              }}
               title="播放器设置"
               aria-label="播放器设置"
             >
@@ -587,6 +664,7 @@ export function DesktopControls(props: PlayerControlsProps) {
             </button>
             {settingsMenuOpen && (
               <div
+                ref={settingsPopoverRef}
                 className={`kz-settings-popover ${
                   settingsSubmenu === 'source' ? 'kz-settings-popover--source' : ''
                 }`}

@@ -64,7 +64,7 @@ function LeaderboardPosterCard({
       to={`/subject/${bangumiId}`}
       target={openInNewTab ? '_blank' : undefined}
       rel={openInNewTab ? 'noopener noreferrer' : undefined}
-      className="group relative block aspect-[3/4] w-full overflow-hidden rounded-2xl bg-[var(--kz-bg-soft)] ring-1 ring-[var(--kz-border)] shadow-[0_8px_20px_rgba(0,0,0,0.12)] dark:shadow-[0_10px_24px_rgba(0,0,0,0.35)] transition-all duration-300 hover:ring-[var(--kz-accent)]/60 hover:shadow-md"
+      className="group relative block aspect-[3/4] w-full overflow-hidden rounded-2xl bg-[var(--kz-bg-soft)] ring-1 ring-[var(--kz-border)] shadow-[0_8px_20px_rgba(0,0,0,0.12)] dark:shadow-[0_10px_24px_rgba(0,0,0,0.35)] transition-all duration-300 hover:ring-[var(--kz-accent)]/60 hover:shadow-md [isolation:isolate] [transform:translateZ(0)]"
     >
       {/* 封面图片 */}
       {coverUrl ? (
@@ -83,7 +83,7 @@ function LeaderboardPosterCard({
       )}
 
       {/* 右上角观看数：樱花粉色；手机端紧凑单位 (如 5.6万 人看过)，桌面端显示完整 */}
-      <div className="pointer-events-none absolute right-2 top-2 z-10 flex items-center text-pink-200 drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]">
+      <div className="pointer-events-none absolute right-2 top-2 z-10 flex items-center text-pink-200 [text-shadow:0_1px_3px_rgba(0,0,0,0.95)]">
         <span className="text-[11.5px] sm:text-[12.5px] font-medium tabular-nums leading-none">
           <span className="sm:hidden">{formatCompactPlayCount(totalPlayCount)} 人看过</span>
           <span className="hidden sm:inline">{formatPlayCount(totalPlayCount)} 人看过</span>
@@ -99,13 +99,13 @@ function LeaderboardPosterCard({
       {/* 底部信息栏：左下角标题（自动截断省略绝不覆盖）+ 右下角金银铜大序号 */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-baseline justify-between gap-1.5 px-2.5 pb-2">
         <span
-          className="min-w-0 flex-1 truncate text-[12.5px] sm:text-[13.5px] font-medium text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+          className="min-w-0 flex-1 truncate text-[12.5px] sm:text-[13.5px] font-medium text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.9)]"
           title={title}
         >
           {title}
         </span>
         <span
-          className={`shrink-0 text-xl sm:text-2xl font-black italic tracking-tighter tabular-nums leading-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] ${rankColor}`}
+          className={`shrink-0 text-xl sm:text-2xl font-black italic tracking-tighter tabular-nums leading-none [text-shadow:0_2px_4px_rgba(0,0,0,0.95)] ${rankColor}`}
         >
           {rank}
         </span>

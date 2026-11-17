@@ -140,7 +140,7 @@ export function NavMobileSearch({ open, onClose }: NavMobileSearchProps) {
           <form
             onSubmit={onSubmit}
             role="search"
-            className="flex h-full w-full items-center gap-2 bg-[var(--kz-header-bg)]/98 px-3 backdrop-blur-2xl border-b border-[var(--kz-border)]"
+            className="flex h-full w-full items-center gap-2 bg-[var(--kz-header-bg)] px-3 border-b border-[var(--kz-border)]"
           >
             {/* Search Input Box */}
             <div className="flex min-w-0 flex-1 items-center rounded-full border border-[var(--kz-accent)] bg-[var(--kz-bg)] shadow-[0_0_12px_var(--kz-accent-ring)]">

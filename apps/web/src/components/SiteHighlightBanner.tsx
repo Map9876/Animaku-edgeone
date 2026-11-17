@@ -51,7 +51,7 @@ const BannerCard = memo(function BannerCard({ item, isDouble = false }: BannerCa
         <>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/75 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 z-10 px-2.5 py-1">
-            <p className="truncate text-[11px] sm:text-xs font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+            <p className="truncate text-[11px] sm:text-xs font-semibold text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]">
               {item.title}
               {item.subtitle && (
                 <span className="ml-1.5 font-normal text-white/80 hidden sm:inline">

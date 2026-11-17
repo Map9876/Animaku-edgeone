@@ -13,7 +13,6 @@ export function Navbar() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(
     () => location.pathname === '/search',
   )
-  const [scrolled, setScrolled] = useState(false)
 
   // Sync mobile search open state with search route
   useEffect(() => {
@@ -24,16 +23,6 @@ export function Navbar() {
     }
   }, [location.pathname])
 
-  // Scroll listener: default transparent at top, elevates to frosted glass when scrolled past 16px
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 16)
-    }
-    handleScroll()
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
   const isWatch =
     location.pathname.startsWith('/subject/') ||
     location.pathname.startsWith('/play/')
@@ -41,11 +30,8 @@ export function Navbar() {
   return (
     <header
       className={clsx(
-        'relative z-40 transition-[background-color,border-color] duration-300 ease-out shadow-none',
+        'relative z-40 border-b border-[var(--kz-border)] bg-[var(--kz-header-bg)] shadow-none',
         isWatch ? 'relative lg:sticky lg:top-0' : 'sticky top-0',
-        scrolled
-          ? 'border-b border-[var(--kz-border)]/80 bg-[var(--kz-header-bg)]/95'
-          : 'border-b border-transparent bg-transparent',
       )}
     >
       {/* Main unified navbar container: h-14 (56px) on mobile, h-16 (64px) on desktop */}

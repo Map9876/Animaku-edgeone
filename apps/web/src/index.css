@@ -17,7 +17,7 @@ html[data-theme='light'] {
   --kz-bg-card: #ffffff;
   --kz-bg-soft: #f1f5f9;
   --kz-bg-hover: #e2e8f0;
-  --kz-header-bg: rgba(248, 250, 252, 0.85);
+  --kz-header-bg: #f8fafc;
 
   /* Lines — subtle crisp slate borders */
   --kz-border: #e2e8f0;
@@ -73,7 +73,7 @@ html[data-theme='dark'] {
   --kz-bg-card: #15181b;
   --kz-bg-soft: #252b30;
   --kz-bg-hover: #2e353b;
-  --kz-header-bg: rgba(18, 20, 23, 0.85);
+  --kz-header-bg: #121417;
 
   /* Lines — refined cool charcoal border */
   --kz-border: #2f363d;

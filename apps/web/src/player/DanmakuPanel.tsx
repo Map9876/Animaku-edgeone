@@ -238,19 +238,22 @@ function MobileSheet(props: Props) {
   useEffect(() => {
     const handleGlobalPointer = (e: MouseEvent | TouchEvent) => {
       if (!modalRef.current) return
-      const target = e.target as Node
-      if (!modalRef.current.contains(target)) {
-        onClose()
+      const target = e.target as HTMLElement | null
+      if (!target) return
+      // 核心修复：如果点击在面板内部，或者点击在底栏的弹幕触发按钮上，绝不视作“点击外部关闭”
+      if (modalRef.current.contains(target) || target.closest('.kz-danmaku-wrap')) {
+        return
       }
+      onClose()
     }
     const timer = setTimeout(() => {
-      window.addEventListener('mousedown', handleGlobalPointer, true)
-      window.addEventListener('touchstart', handleGlobalPointer, true)
+      window.addEventListener('mousedown', handleGlobalPointer)
+      window.addEventListener('touchstart', handleGlobalPointer)
     }, 60)
     return () => {
       clearTimeout(timer)
-      window.removeEventListener('mousedown', handleGlobalPointer, true)
-      window.removeEventListener('touchstart', handleGlobalPointer, true)
+      window.removeEventListener('mousedown', handleGlobalPointer)
+      window.removeEventListener('touchstart', handleGlobalPointer)
     }
   }, [onClose])
 

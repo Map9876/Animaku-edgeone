@@ -27,7 +27,7 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback
       }
       return (
-        <div className="min-h-screen bg-[var(--kz-bg)] px-4 py-12 text-[var(--kz-fg)]">
+        <div className="min-h-screen min-h-dvh bg-[var(--kz-bg)] px-4 py-12 text-[var(--kz-fg)]">
           <NotFoundPage
             type="error"
             title="应用遇到了意外错误"

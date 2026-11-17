@@ -305,7 +305,7 @@ export const HomeHeroBanner = memo(function HomeHeroBanner({
                   {/* 副标题 / 描述在前 */}
                   {currentSlide.item.subtitle && (
                     <p
-                      className="text-white/80 line-clamp-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+                      className="text-white/80 line-clamp-1 [text-shadow:0_1px_2px_rgba(0,0,0,0.85)]"
                       style={{ fontSize: 'clamp(11px, 2.6cqw, 13px)' }}
                     >
                       {currentSlide.item.subtitle}
@@ -314,7 +314,7 @@ export const HomeHeroBanner = memo(function HomeHeroBanner({
                   {/* 标题在后（下方，右侧预留空间避让指示点） */}
                   {currentSlide.item.title && (
                     <h3
-                      className="font-black text-white tracking-wide truncate drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)] pr-20 sm:pr-24"
+                      className="font-black text-white tracking-wide truncate [text-shadow:0_2px_4px_rgba(0,0,0,0.85)] pr-20 sm:pr-24"
                       style={{
                         fontSize: 'clamp(15px, 4.2cqw, 24px)',
                         lineHeight: 1.2,
@@ -329,7 +329,7 @@ export const HomeHeroBanner = memo(function HomeHeroBanner({
                   {/* 推荐理由 / 描述在前（上方），拥有整行宽度无任何遮挡 */}
                   {displayReason && (
                     <p
-                      className="flex items-center text-white/85 line-clamp-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]"
+                      className="flex items-center text-white/85 line-clamp-1 [text-shadow:0_1px_2px_rgba(0,0,0,0.85)]"
                       style={{
                         fontSize: 'clamp(11px, 2.6cqw, 13px)',
                         gap: 'clamp(4px, 1cqw, 6px)',
@@ -348,7 +348,7 @@ export const HomeHeroBanner = memo(function HomeHeroBanner({
 
                   {/* 番剧标题在后（下方），右侧预留 pr-20 避让指示点 */}
                   <h3
-                    className="font-black text-white tracking-wide truncate drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)] pr-20 sm:pr-24"
+                    className="font-black text-white tracking-wide truncate [text-shadow:0_2px_4px_rgba(0,0,0,0.85)] pr-20 sm:pr-24"
                     style={{
                       fontSize: 'clamp(15px, 4.2cqw, 24px)',
                       lineHeight: 1.2,

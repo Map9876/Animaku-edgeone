@@ -51,7 +51,7 @@ export function Layout() {
     location.pathname.startsWith('/play/')
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--kz-bg)] text-[var(--kz-fg)]">
+    <div className="flex min-h-screen min-h-dvh flex-col bg-[var(--kz-bg)] text-[var(--kz-fg)]">
       <DocumentSeo />
 
       {/* 现代解耦顶部导航栏 */}

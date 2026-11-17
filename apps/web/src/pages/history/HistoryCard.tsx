@@ -132,7 +132,7 @@ export function HistoryCard({
         onMouseEnter={onWarmup}
         onFocus={onWarmup}
         onTouchStart={onWarmup}
-        className="relative block shrink-0 overflow-hidden rounded-lg bg-[var(--kz-bg-soft)] shadow-xs ring-1 ring-[var(--kz-border)]"
+        className="relative block shrink-0 overflow-hidden rounded-lg bg-[var(--kz-bg-soft)] shadow-xs ring-1 ring-[var(--kz-border)] [isolation:isolate] [transform:translateZ(0)]"
       >
         {entry.cover ? (
           <img
@@ -156,7 +156,7 @@ export function HistoryCard({
               已看完
             </span>
           ) : (
-            <span className="text-[10px] font-medium text-white/90 drop-shadow-xs">
+            <span className="text-[10px] font-medium text-white/90 [text-shadow:0_1px_2px_rgba(0,0,0,0.85)]">
               {pct > 0 ? `${pct}%` : '未播'}
             </span>
           )}
