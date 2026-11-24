@@ -1,0 +1,85 @@
+# CNB → EdgeOne Pages 自动部署
+# 复刻自 kfc50/vless-websocket-edgeone，改成 animaku-edgeone
+# 机制：CNB push → webhook 通知 EdgeOne（site=intl）→ EdgeOne 从本仓库拉取并构建
+#
+# 注意：本仓库 cloud-functions/api/[[default]].js 是 esbuild 产物，
+# 由「构建」阶段生成后再通知 EdgeOne。若改用 EdgeOne 侧构建，请确保
+# EdgeOne 项目指向本仓库 master 且安装了 package.json 依赖。
+main:
+  push:
+  # 串行锁：多个 push 间隔很近时，避免两个 git-sync 同时 force push GitHub 造成
+  # ref 锁冲突（remote rejected: cannot lock ref）。wait=true 让后一个构建等待前一个跑完。
+  - lock:
+      key: animaku-push-sync
+      wait: true
+      timeout: 600
+      expires: 3600
+    # 从密钥仓库 kfc50/key 的 envs.yml 注入环境变量（含 GIT_PASSWORD=GitHub PAT）。
+    # 密钥仓库禁止本地克隆/token 读取，只能在流水线里通过 imports 引用。
+    imports: https://cnb.cool/kfc50/key/-/blob/main/envs.yml
+    stages:
+    - name: 构建 EdgeOne 函数 bundle
+      image: node:22
+      script:
+        # 上游 Animaku 要求 pnpm@9.15.0 + node>=22，用 corepack 激活指定版本
+        - corepack enable && corepack prepare pnpm@9.15.0 --activate
+        - npm install --no-audit --no-fund
+        # 拉取 Animaku 上游最新 master（--remote），实现「定时更新源项目」
+        - git submodule update --init --remote --recursive
+        - node scripts/build-edge.mjs
+        # 把 16 个源的 TS 解析代码重新打包成 parsers.cjs（随上游更新）
+        - node scripts/build-resolvers.mjs
+        # 把最新前端构建产物同步进来并注入我们的开关脚本
+        - node scripts/sync-web.mjs
+        - node scripts/inject-into-html.mjs
+        # 有变化才把产物提交回仓库，EdgeOne 下次拉取即拿到最新成品
+        - sh scripts/ci-commit-artifacts.sh
+    - name: notify-edgeone
+      image: cnbcool/webhook
+      settings:
+        urls:
+          - https://api.edgeone.ai/eo/pages/hook/cnb?site=intl
+        method: POST
+        content_type: application/json
+        template: |
+          {
+            "repoName": "{{ CNB_REPO_NAME }}",
+            "repoUrl": "{{ CNB_REPO_URL_HTTPS }}",
+            "branch": "{{ CNB_BRANCH }}",
+            "commit": "{{ CNB_COMMIT_SHORT }}",
+            "commitMessage": "{{ CNB_COMMIT_MESSAGE }}",
+            "committer": "{{ CNB_COMMITTER }}",
+            "event": "{{ CNB_EVENT }}",
+            "buildId": "{{ CNB_BUILD_ID }}",
+            "buildWebUrl": "{{ CNB_BUILD_WEB_URL }}",
+            "buildUser": "{{ CNB_BUILD_USER }}",
+            "pipelineName": "{{ CNB_PIPELINE_NAME }}"
+          }
+    # CNB → GitHub 自动同步：每次 push（含 CI 产物回写）后把最终代码镜像到独立 GitHub 仓库。
+    # 安全：本 .cnb.yml 会被同步到【公开】GitHub 仓库，故 token 绝不写在此文件，
+    # 改为引用 CNB 项目环境变量 GIT_PASSWORD（在 CNB 网页「项目设置→环境变量」设置一次）。
+    - name: sync-to-github
+      image: tencentcom/git-sync
+      settings:
+        target_url: https://github.com/Map9876/animaku-edgeone-cnb.git
+        auth_type: https
+        username: x-access-token
+        password: ${GIT_PASSWORD}
+        branch: main
+        force: true
+    # 把我们的 EdgeOne 成果作为【孤儿分支 edge】推到我们自己的 fork Map9876/Animaku-edgeone：
+    # 孤儿分支无共同祖先、不污染 fork master 的原版历史——体现"贡献"而非"盗取"。
+    # 以后可从 edge 分支提 PR，或在 fork master README 加部署按钮引导。
+    # token 走 imports 注入，不落地；fork 有 LFS，必须装 git-lfs 否则 pre-push hook 失败。
+    - name: mirror-to-fork-orphan-edge
+      image: alpine:3.19
+      script:
+        - apk add --no-cache git git-lfs >/dev/null
+        - git lfs install --local
+        - git config user.name 'cnb.ageYeGZgDeAAA'
+        - git config user.email 'ZVf1wkjMS765mM87le0jvK+cnb.ageYeGZgDeAAA@noreply.cnb.cool'
+        # 孤儿分支：全新根提交，无父、不继承原版历史
+        - git checkout --orphan edge
+        - git add -A
+        - git commit -m 'EdgeOne distribution (orphan branch)'
+        - git push --force "https://x-access-token:${GIT_PASSWORD}@github.com/Map9876/Animaku-edgeone.git" "edge:refs/heads/edge"

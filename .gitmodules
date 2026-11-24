@@ -1,0 +1,4 @@
+[submodule "upstream/animaku"]
+	path = upstream/animaku
+	url = https://github.com/Map9876/Animaku-edgeone.git
+	branch = master

@@ -1,0 +1,8 @@
+node_modules/
+.git/
+.edgeone/
+*.log
+
+*.mp4
+runtime/_resolvers-entry.ts
+scripts/dev-server.mjs
